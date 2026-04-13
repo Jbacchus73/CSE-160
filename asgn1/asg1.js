@@ -100,8 +100,13 @@ function addActionsForHtmIUI(){
     let start = g_strokeStarts.pop();
     g_shapesList.length = start;
   }
+
+
   renderAllshapes();
 };
+
+// play game 
+ document.getElementById('snakeButton').onclick = startSnake;
 
 }
 
