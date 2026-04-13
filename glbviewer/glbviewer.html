@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>GLB Viewer</title>
+    <style>
+        body {
+            margin: 0; font-family: sans-serif;
+            background: #111; color: #ccc;
+        }
+        h1 { color: #fff; margin-bottom: 8px; }
+        p { margin: 0 0 24px; color: #888; }
+        #landing {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100vh; width: 100%;
+        }
+        #dropzone {
+            width: 500px; height: 300px;
+            border: 2px dashed #555; border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column; gap: 8px;
+            color: #666; font-size: 18px;
+            transition: all 0.2s;
+        }
+        #dropzone.hover { border-color: #66f; background: rgba(102,102,255,0.1); color: #99f; }
+        #dropzone .icon { font-size: 48px; }
+        #viewer { display: none; width: 100%; height: 100vh; position: absolute; top: 0; left: 0; }
+        #back {
+            position: absolute; top: 16px; left: 16px;
+            background: rgba(255,255,255,0.1); color: #fff;
+            border: 1px solid #555; border-radius: 8px;
+            padding: 8px 16px; cursor: pointer; font-size: 14px;
+            display: none; z-index: 10;
+        }
+        #back:hover { background: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+    <div id="landing">
+        <h1>GLB Model Viewer</h1>
+        <p>Drag and drop a .glb file to view it in 3D</p>
+        <p style="font-size: 14px; color: #666; margin-bottom: 24px;">
+            Left click + drag to rotate · Right click + drag to pan · Scroll to zoom
+        </p>
+        <div id="dropzone">
+            <div class="icon">📦</div>
+            <div>Drop .glb file here</div>
+        </div>
+    </div>
+    <div id="viewer"></div>
+    <button id="back" onclick="goBack()">← Drop another file</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+        }
+
+        let scriptsReady = loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js')
+            .then(() => loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js'));
+
+        let scene, camera, renderer, controls;
+
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+            camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 1000);
+            camera.position.set(0, 2, 5);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(innerWidth, innerHeight);
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            document.getElementById('viewer').appendChild(renderer.domElement);
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+            dir.position.set(5, 10, 7);
+            scene.add(dir);
+            window.addEventListener('resize', () => {
+                camera.aspect = innerWidth / innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(innerWidth, innerHeight);
+            });
+            (function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            })();
+        }
+
+        function loadGLB(arrayBuffer) {
+            const loader = new THREE.GLTFLoader();
+            loader.parse(arrayBuffer, '', (gltf) => {
+                while (scene.children.length > 2) scene.remove(scene.children[scene.children.length - 1]);
+                const model = gltf.scene;
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3()).length();
+                const center = box.getCenter(new THREE.Vector3());
+                model.position.sub(center);
+                model.scale.setScalar(3 / size);
+                scene.add(model);
+                controls.reset();
+            }, (err) => alert('Error loading GLB: ' + err));
+        }
+
+        function goBack() {
+            document.getElementById('landing').style.display = 'flex';
+            document.getElementById('viewer').style.display = 'none';
+            document.getElementById('back').style.display = 'none';
+        }
+
+        const dropzone = document.getElementById('dropzone');
+        dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('hover'); });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('hover'));
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('hover');
+            const file = e.dataTransfer.files[0];
+            if (!file || !file.name.endsWith('.glb')) { alert('Please drop a .glb file'); return; }
+
+            scriptsReady.then(() => {
+                document.getElementById('landing').style.display = 'none';
+                document.getElementById('viewer').style.display = 'block';
+                document.getElementById('back').style.display = 'block';
+                if (!scene) initScene();
+                const reader = new FileReader();
+                reader.onload = () => loadGLB(reader.result);
+                reader.readAsArrayBuffer(file);
+            });
+        });
+    </script>
+</body>
+</html>
