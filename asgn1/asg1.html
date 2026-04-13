@@ -5,21 +5,32 @@
   </head>
 
   <body onload="main()">
-    <canvas id="asg1" width="400" height="400">
-    Please use a browser that supports "canvas"
-    </canvas>
+    <div style="display: flex; gap: 20px;">
+      <canvas id="asg1" width="400" height="400">
+        Please use a browser that supports "canvas"
+  </canvas>
+  <div>
+    <b>My Drawing:</b><br>
+    <img src="garfield.png" alt="Hand-drawn sketch" style="max-width: 400px; height: auto;">
+    <img src="GarfieldDrawing.png" alt="Hand-drawn sketch" style="max-width: 400px; height: auto;">
+  </div>
+</div>
     <p>
 
     <p id="numdot" > XXX </p> 
     
+    <p><b>Color Presets:</b></p>
     <button type="button" id="green">Green</button>
     <button type="button" id="red">Red</button>
     <button type="button" id="clearButton">Clear</button>
     <p> 
     
+    <p><b>Drawing Shape:</b></p>
     <button type="button" id="pointButton">Point</button>
     <button type="button" id="triButton">Triangle</button>
     <button type="button" id="circleButton">Circle</button>
+
+    <p><b>Shape Settings:</b></p>
     <p>
     Circle Segment Count: <input type="range" min="3" max="30" value="10" class="slider" id="segSlide">
 
@@ -34,6 +45,8 @@
     <p>
     Size <input type="range" min="5" max="40" value="0" class="slider" id="sizeSlice">
     <p>
+    <button type="button" id="undoButton">Undo</button>
+
 
     <script src="lib/webgl-utils.js"></script>
     <script src="lib/webgl-debug.js"></script>

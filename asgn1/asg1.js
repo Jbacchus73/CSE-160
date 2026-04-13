@@ -71,6 +71,7 @@ let g_selectedColor= [1.0,1.0,1.0,1.0];
 let g_selectedSize = 5;
 let g_selectedType=POINT; 
 let g_selectedSeg = 10;
+let g_strokeStarts = [];
 
 function addActionsForHtmIUI(){
   //Button Events 
@@ -92,6 +93,16 @@ function addActionsForHtmIUI(){
 
   //Size Slider Events
   document.getElementById('sizeSlice').addEventListener('mouseup', function() { g_selectedSize = this.value;});
+
+  // Undo Button
+  document.getElementById('undoButton').onclick = function(){
+  if (g_strokeStarts.length > 0) {
+    let start = g_strokeStarts.pop();
+    g_shapesList.length = start;
+  }
+  renderAllshapes();
+};
+
 }
 
 
@@ -105,7 +116,10 @@ function main() {
 
 
   // Register function (event handler) to be called on a mouse press
-  canvas.onmousedown = click; 
+  canvas.onmousedown = function(ev){ 
+    g_strokeStarts.push(g_shapesList.length); 
+    click(ev); 
+  }; 
   canvas.onmousemove = function(ev) { if(ev.buttons == 1) { click(ev) } };
 
   // Specify the color for clearing <canvas>
