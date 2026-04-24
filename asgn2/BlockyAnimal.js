@@ -159,9 +159,8 @@ function renderAllshapes(){
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  const FUR = [0.55, 0.42, 0.30, 1.0];      // warm grey-brown
+  const FUR = [0.55, 0.42, 0.30, 1.0];  
 
-   // ===== BODY — long rectangular box =====
   var body = new Cube();
   body.color = FUR;
   body.matrix.setTranslate(0, 0, 0) ;
@@ -176,17 +175,15 @@ function renderAllshapes(){
   neck.matrix.translate(-0.5, -0.5, -0.5);
   neck.render();
 
-  const FUR_LIGHT = [0.72, 0.64, 0.55, 1.0];   // warm cream belly
+  const FUR_LIGHT = [0.72, 0.64, 0.55, 1.0];  
 
-  // ===== BELLY — lighter underside (peeks out below) =====
   var belly = new Cube();
   belly.color = FUR_LIGHT;
-  belly.matrix.setTranslate(0, -0.18, 0);      // was -0.1, drop it down
+  belly.matrix.setTranslate(0, -0.18, 0);   
   belly.matrix.scale(0.30, 0.01, 0.5);
   belly.matrix.translate(-0.5, -0.5, -0.5);
   belly.render()
 
-  // ===== MINI TAIL — tiny stub at rear =====
   var tail = new Cube();
   tail.color = FUR;
   tail.matrix.setTranslate(0, -0.01, -0.3);
@@ -209,9 +206,6 @@ function renderAllshapes(){
   const NOSE       = [0.12, 0.08, 0.06, 1.0];   // dark nose
   const MOUTH      = [0.18, 0.12, 0.08, 1.0];   // dark mouth
 
-  // Head front face at z = 0.35 + 0.14 = 0.49
-
-  // ===== PALE FACE MASK (covers most of head front) =====
   var face = new Cube();
   face.color = FACE_PALE;
   face.matrix.setTranslate(0, -0.05, 0.611); 
@@ -219,7 +213,7 @@ function renderAllshapes(){
   face.matrix.translate(-0.5, -0.5, -0.5);
   face.render();
 
-  // ===== DARK EYE BAND (on top of pale mask) =====
+
   var band = new Cube();
   band.color = EYE_BAND;
   band.matrix.setTranslate(0, 0.0, 0.617);
@@ -227,7 +221,6 @@ function renderAllshapes(){
   band.matrix.translate(-0.5, -0.5, -0.5);
   band.render();
 
-  // ===== LEFT EYE =====
   var lEye = new Cube();
   lEye.color = EYE_WHITE;
   lEye.matrix.setTranslate(-0.07, 0.0, 0.625);
@@ -235,7 +228,6 @@ function renderAllshapes(){
   lEye.matrix.translate(-0.5, -0.5, -0.5);
   lEye.render();
 
-  // ===== RIGHT EYE =====
   var rEye = new Cube();
   rEye.color = EYE_WHITE;
   rEye.matrix.setTranslate(0.07, 0.0, 0.625);
@@ -243,20 +235,17 @@ function renderAllshapes(){
   rEye.matrix.translate(-0.5, -0.5, -0.5);
   rEye.render();
 
-  // ===== MUZZLE — PROTRUDING 3D BLOCK =====
   var muzzle = new Cube();
   muzzle.color = MUZZLE;
-  muzzle.matrix.setTranslate(0, -0.11, 0.645);   // sits in front of face by 0.035
+  muzzle.matrix.setTranslate(0, -0.11, 0.645);  
   muzzle.matrix.rotate(15, 1, 0, 0);
-  muzzle.matrix.scale(0.14, 0.1, 0.09);          // now 0.06 DEEP → actual 3D block
+  muzzle.matrix.scale(0.14, 0.1, 0.09);          
   muzzle.matrix.translate(-0.5, -0.5, -0.5);
   muzzle.render();
 
-  // ===== NOSE (on front face of muzzle) =====
-  // ===== TWO NOSTRILS (replace the single nose cube) =====
-  const NOSTRIL = [0.05, 0.03, 0.02, 1.0];   // near-black nostril
 
-  // Left nostril
+  const NOSTRIL = [0.05, 0.03, 0.02, 1.0];  
+
   var lNostril = new Cube();
   lNostril.color = NOSTRIL;
   lNostril.matrix.setTranslate(-0.018, -0.08, 0.681);
@@ -264,7 +253,6 @@ function renderAllshapes(){
   lNostril.matrix.translate(-0.5, -0.5, -0.5);
   lNostril.render();
 
-  // Right nostril
   var rNostril = new Cube();
   rNostril.color = NOSTRIL;
   rNostril.matrix.setTranslate(0.018, -0.08, 0.681);
@@ -272,7 +260,6 @@ function renderAllshapes(){
   rNostril.matrix.translate(-0.5, -0.5, -0.5);
   rNostril.render();
 
-  // ===== MOUTH (on bottom-front of muzzle) =====
   var mouth = new Cube();
   mouth.color = NOSTRIL;
   mouth.matrix.setTranslate(0, -0.13, 0.681);
@@ -282,16 +269,14 @@ function renderAllshapes(){
 
   const EYE_STREAK = [0.18, 0.12, 0.08, 1.0];   // same color as eye band
 
-  // ===== LEFT EYE STREAK (tear stripe going down-outward) =====
   var lStreak = new Cube();
   lStreak.color = EYE_STREAK;
   lStreak.matrix.setTranslate(-0.09, -0.075, 0.617);
-  lStreak.matrix.rotate(-20, 0, 0, 1);             // angle down-outward
+  lStreak.matrix.rotate(-20, 0, 0, 1);            
   lStreak.matrix.scale(0.04, 0.23, 0.008);
   lStreak.matrix.translate(-0.5, -0.5, -0.5);
   lStreak.render();
 
-  // ===== RIGHT EYE STREAK =====
   var rStreak = new Cube();
   rStreak.color = EYE_STREAK;
   rStreak.matrix.setTranslate(0.09, -0.075, 0.617);
@@ -300,49 +285,164 @@ function renderAllshapes(){
   rStreak.matrix.translate(-0.5, -0.5, -0.5);
   rStreak.render();
 
-  const LIMB = [0.42, 0.32, 0.22, 1.0];   // slightly darker than body
-
-  // ===== FRONT-LEFT UPPER ARM (perpendicular, sticking straight out) =====
   var flUpper = new Cube();
-  flUpper.color = LIMB;
-  flUpper.matrix.setTranslate(-0.2, -0.15, 0.15);
-  flUpper.matrix.rotate(-75, 0, 0, 1);              // rotate around Z-axis → horizontal
+  flUpper.color = FUR;
+  flUpper.matrix.setTranslate(-0.15, 0.1, 0.15);   
+  flUpper.matrix.rotate(-35, 0, 0, 1);
   var flElbowMat = new Matrix4(flUpper.matrix);
-  flUpper.matrix.scale(0.11, 0.3, 0.11);
+  flUpper.matrix.scale(0.11, 0.35, 0.175);
   flUpper.matrix.translate(-0.5, -1.0, -0.5);
   flUpper.render();
 
-  // ===== FRONT-RIGHT UPPER ARM =====
   var frUpper = new Cube();
-  frUpper.color = LIMB;
-  frUpper.matrix.setTranslate(0.2, -0.15, 0.15);
-  frUpper.matrix.rotate(75, 0, 0, 1);             // opposite direction for right side
+  frUpper.color = FUR;
+  frUpper.matrix.setTranslate(0.15, .1, 0.15);    
+  frUpper.matrix.rotate(35, 0, 0, 1);
   var frElbowMat = new Matrix4(frUpper.matrix);
-  frUpper.matrix.scale(0.11, 0.3, 0.11);
+  frUpper.matrix.scale(0.11, 0.35, 0.175);
   frUpper.matrix.translate(-0.5, -1.0, -0.5);
   frUpper.render();
 
   var frFore = new Cube();
-  frFore.color = LIMB;
+  frFore.color = FUR;
   frFore.matrix = frElbowMat;
-  frFore.matrix.translate(0, -0.25, 0);
+  frFore.matrix.translate(.03, -0.25, 0);
   frFore.matrix.rotate(-75, 1, 0, 0);
-  frFore.matrix.translate(-0.03, 0, 0);             // opposite shift for mirrored arm
-  frFore.matrix.scale(0.1, 0.3, 0.15);
+  frFore.matrix.translate(-0.03, 0, 0);             
+  var frHandMat = new Matrix4(frFore.matrix);
+  frFore.matrix.scale(0.1, 0.35, 0.15);
   frFore.matrix.translate(-0.5, -1.0, -0.5);
   frFore.render();
 
   var flFore = new Cube();
-  flFore.color = LIMB;
+  flFore.color = FUR;
   flFore.matrix = flElbowMat;
-  flFore.matrix.translate(0, -0.25, 0);             // move to end of upper arm (elbow)
-  flFore.matrix.rotate(-75, 1, 0, 0);               // 90° forward bend
-  flFore.matrix.translate(0.03, 0, 0);              // shift slightly toward front (in upper arm's frame)
-  flFore.matrix.scale(0.1, 0.3, 0.15);
+  flFore.matrix.translate(-.03, -0.25, 0);             
+  flFore.matrix.rotate(-75, 1, 0, 0);              
+  flFore.matrix.translate(0.03, 0, 0);              
+  var flHandMat = new Matrix4(flFore.matrix);
+  flFore.matrix.scale(0.1, 0.35, 0.15);
   flFore.matrix.translate(-0.5, -1.0, -0.5);
   flFore.render();
+
+  var blUppper = new Cube();
+  blUppper.color = FUR;
+  blUppper.matrix.setTranslate(-0.15, 0.1, -0.18);  
+  blUppper.matrix.rotate(-35, 0, 0, 1);
+  var blElbowMat = new Matrix4(blUppper.matrix);
+  blUppper.matrix.scale(0.11, 0.35, 0.175);
+  blUppper.matrix.translate(-0.5, -1.0, -0.5);
+  blUppper.render();
+
+  var brUpper = new Cube();
+  brUpper.color = FUR;
+  brUpper.matrix.setTranslate(0.15, .1, -0.18);   
+  brUpper.matrix.rotate(35, 0, 0, 1);
+  var brElbowMat = new Matrix4(brUpper.matrix);
+  brUpper.matrix.scale(0.11, 0.35, 0.175);
+  brUpper.matrix.translate(-0.5, -1.0, -0.5);
+  brUpper.render();
+
+  var blFore = new Cube();
+  blFore.color = FUR;
+  blFore.matrix = blElbowMat;
+  blFore.matrix.translate(.03, -0.25, 0);
+  blFore.matrix.rotate(-60, 1, 0, 0);
+  blFore.matrix.translate(-0.03, 0, 0);            
+  var blHandMat = new Matrix4(blFore.matrix);
+  blFore.matrix.scale(0.1, 0.15, 0.15);
+  blFore.matrix.translate(-0.5, -1.0, -0.5);
+  blFore.render();
+
+  var brFore = new Cube();
+  brFore.color = FUR;
+  brFore.matrix = brElbowMat;
+  brFore.matrix.translate(.03, -0.25, 0);
+  brFore.matrix.rotate(-60, 1, 0, 0);
+  brFore.matrix.translate(-0.03, 0, 0);             
+  var brHandMat = new Matrix4(brFore.matrix);
+  brFore.matrix.scale(0.1, 0.15, 0.15);
+  brFore.matrix.translate(-0.5, -1.0, -0.5);
+  brFore.render();
+
+  const CLAW = [0.95, 0.92, 0.85, 1.0];
+
+  function drawClaws(parentMat, armLength) {
+    for (let i = 0; i < 3; i++) {
+      var c = new Cube();
+      c.color = CLAW;
+      c.matrix = new Matrix4(parentMat);
+      c.matrix.translate(-0.03 + i * 0.03, -armLength, 0);
+      c.matrix.rotate(20, 1, 0, 0); 
+      c.matrix.scale(0.022, 0.08, 0.04);
+      c.matrix.translate(-0.5, -1.0, -0.5);
+      c.render();
+    }
+  }
+
+  drawClaws(flHandMat, 0.35);
+  drawClaws(frHandMat, 0.35);
+  drawClaws(blHandMat, 0.15);
+  drawClaws(brHandMat, 0.15);
+
+  var lShine = new Cube();
+  lShine.color = [1.0, 1.0, 1.0, 1.0];
+  lShine.matrix.setTranslate(-0.058, 0.013, 0.631);
+  lShine.matrix.scale(0.012, 0.015, 0.005);
+  lShine.matrix.translate(-0.5, -0.5, -0.5);
+  lShine.render();
+
+  var rShine = new Cube();
+  rShine.color = [1.0, 1.0, 1.0, 1.0];
+  rShine.matrix.setTranslate(0.082, 0.013, 0.631);
+  rShine.matrix.scale(0.012, 0.015, 0.005);
+  rShine.matrix.translate(-0.5, -0.5, -0.5);
+  rShine.render();
+
+  var backStripe = new Cube();
+  backStripe.color = [0.42, 0.32, 0.22, 1.0];   
+  backStripe.matrix.setTranslate(0, 0.175, 0);
+  backStripe.matrix.scale(0.3, 0.005, 0.55);
+  backStripe.matrix.translate(-0.5, -0.5, -0.5);
+  backStripe.render();
+
+  var flShoulder = new Cube();
+  flShoulder.color = FUR;
+  flShoulder.matrix.setTranslate(-0.16, 0.08, 0.15);
+  flShoulder.matrix.scale(0.14, 0.14, 0.14);
+  flShoulder.matrix.translate(-0.5, -0.5, -0.5);
+  flShoulder.render();
+
+  var frShoulder = new Cube();
+  frShoulder.color = FUR;
+  frShoulder.matrix.setTranslate(0.16, 0.08, 0.15);
+  frShoulder.matrix.scale(0.14, 0.14, 0.14);
+  frShoulder.matrix.translate(-0.5, -0.5, -0.5);
+  frShoulder.render();
+
+  var blHip = new Cube();
+  blHip.color = FUR;
+  blHip.matrix.setTranslate(-0.16, 0.08, -0.15);
+  blHip.matrix.scale(0.14, 0.14, 0.14);
+  blHip.matrix.translate(-0.5, -0.5, -0.5);
+  blHip.render();
+
+  var brHip = new Cube();
+  brHip.color = FUR;
+  brHip.matrix.setTranslate(0.16, 0.08, -0.15);
+  brHip.matrix.scale(0.14, 0.14, 0.14);
+  brHip.matrix.translate(-0.5, -0.5, -0.5);
+  brHip.render();
+
+
+  const GRASS = [0.3, 0.55, 0.25, 1.0];
+  var ground = new Cube();
+  ground.color = GRASS;
+  ground.matrix.setTranslate(0, -0.42, 0);
+  ground.matrix.scale(10, 0.05, 10);
+  ground.matrix.translate(-0.5, -0.5, -0.5);
+  ground.render();
   
-  // FPS
   var duration = performance.now() - startTime;
   sendTextToHTML("ms: " + Math.floor(duration) + " fps: " + Math.floor(1000/duration), "numdot");
 }
