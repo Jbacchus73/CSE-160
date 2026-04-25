@@ -13,25 +13,98 @@
     Please use a browser that supports "canvas"
   </canvas>
 
-  <p id="numdot">XXX</p>
+  <p id="numdot">FPS</p>
 
-  <p>Red <input type="range" min="0" max="100" value="100" class="slider" id="redSlide"></p>
+  <h3>Controls</h3>
 
-  <p>Magenta <input type="range" min="-45" max="45" value="0" class="slider" id="magentaSlide"></p>
-
-  <p>Yellow <input type="range" min="-45" max="45" value="0" class="slider" id="yellowSlide">
-    Animation:
-    <button type="button" id="animationYellowOnButton">ON</button>
-    <button type="button" id="animationYellowOffButton">OFF</button>
+  <p>
+  Move Camera: <b>W</b> Forward,
+  <b>S</b> Backward,
+  <b>A</b> Left,
+  <b>D</b> Right
   </p>
 
-  <p>Camera Angle <input type="range" min="0" max="90" value="5" class="slider" id="angleSlide"></p>
+  <p>
+  Elevation: <b>Q</b> Up,
+  <b>E</b> Down
+  </p>
+
+  <p>
+  Look Around: Hold <b>Middle Mouse</b> and drag
+  </p>
+
+  <p>Shift + Click: Trigger poke animation</p>
+
+  <p>
+    Camera Angle: 
+    <input type="range" min="0" max="360" value="5" class="slider" id="angleSlide">
+  </p>
+
+  Animation:
+  <button type="button" id="animationYellowOnButton">ON</button>
+  <button type="button" id="animationYellowOffButton">OFF</button>
+
+  <h3>Left Arm</h3>
+  <p>
+    Upper Arm
+    <input type="range" min="-45" max="45" value="0" class="slider" id="flUpperSlide">
+  </p>
+  <p>
+    Forearm
+    <input type="range" min="-60" max="60" value="0" class="slider" id="flForeSlide">
+  </p>
+  <p>
+    Claws / Hand
+    <input type="range" min="-45" max="45" value="0" class="slider" id="flClawSlide">
+  </p>
+  <h3>Right Arm</h3>
+  <p>
+    Upper Arm
+    <input type="range" min="-45" max="45" value="0" class="slider" id="frUpperSlide">
+  </p>
+  <p>
+    Forearm
+    <input type="range" min="-60" max="60" value="0" class="slider" id="frForeSlide">
+  </p>
+  <p>
+    Claws / Hand
+    <input type="range" min="-45" max="45" value="0" class="slider" id="frClawSlide">
+  </p>
+  <h3>Left Leg</h3>
+  <p>
+    Upper Leg
+    <input type="range" min="-45" max="45" value="0" class="slider" id="blUpperSlide">
+  </p>
+  <p>
+    Lower Leg
+    <input type="range" min="-60" max="60" value="0" class="slider" id="blForeSlide">
+  </p>
+  <p>
+    Claws / Foot
+    <input type="range" min="-45" max="45" value="0" class="slider" id="blClawSlide">
+  </p>
+  <h3>Right Leg</h3>
+  <p>
+    Upper Leg
+    <input type="range" min="-45" max="45" value="0" class="slider" id="brUpperSlide">
+  </p>
+  <p>
+    Lower Leg
+    <input type="range" min="-60" max="60" value="0" class="slider" id="brForeSlide">
+  </p>
+  <p>
+    Claws / Foot
+    <input type="range" min="-45" max="45" value="0" class="slider" id="brClawSlide">
+  </p>
+  </div>
+
 
   <script src="lib/webgl-utils.js"></script>
   <script src="lib/webgl-debug.js"></script>
   <script src="lib/cuon-utils.js"></script>
   <script src="lib/cuon-matrix-cse160.js"></script>
   <script src="Cube.js"></script>
+  <script src="Cone.js"></script>
   <script src="Triangle.js"></script>
   <script src="BlockyAnimal.js"></script>
 </body>
