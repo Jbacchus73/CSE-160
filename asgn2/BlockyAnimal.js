@@ -126,8 +126,6 @@ let g_frHandAngle = 0;
 
 
 let g_globalAngle = 0;
-
-
 let g_globalAngleY = 0;
 let g_mouseDragging = false;
 let g_lastMouseX = 0;
@@ -169,14 +167,12 @@ function addActionsForHtmIUI(){
   // Camera Controls 
 
   canvas.onmousedown = function(ev) {
-
-  if (ev.shiftKey) {
-  g_pokeAnimation = true;
-  g_pokeStartTime = g_seconds;
-  ev.preventDefault();
-  return;
-}
-
+    if (ev.shiftKey) {
+      g_pokeAnimation = true;
+      g_pokeStartTime = g_seconds;
+      ev.preventDefault();
+      return;
+  }
   if (ev.button === 1) {               
     g_mouseDragging = true;
     g_lastMouseX = ev.clientX;
@@ -185,54 +181,54 @@ function addActionsForHtmIUI(){
   }
 };
 
-canvas.onmouseup = function(ev) {
-  if (ev.button === 1) g_mouseDragging = false;
-};
+  canvas.onmouseup = function(ev) {
+    if (ev.button === 1) g_mouseDragging = false;
+  };
 
-canvas.onmouseleave = function(ev) {
-  g_mouseDragging = false;
-};
+  canvas.onmouseleave = function(ev) {
+    g_mouseDragging = false;
+  };
 
-canvas.onmousemove = function(ev) {
-  if (!g_mouseDragging) return;
+  canvas.onmousemove = function(ev) {
+    if (!g_mouseDragging) return;
 
-  let dx = ev.clientX - g_lastMouseX;
-  let dy = ev.clientY - g_lastMouseY;
+    let dx = ev.clientX - g_lastMouseX;
+    let dy = ev.clientY - g_lastMouseY;
 
-  g_cameraYaw += dx * g_mouseSensitivity;
-  g_cameraPitch -= dy * g_mouseSensitivity;
+    g_cameraYaw += dx * g_mouseSensitivity;
+    g_cameraPitch -= dy * g_mouseSensitivity;
 
-  if (g_cameraPitch > 89) {
-    g_cameraPitch = 89;
-  }
+    if (g_cameraPitch > 89) {
+      g_cameraPitch = 89;
+    }
 
-  if (g_cameraPitch < -89) {
-    g_cameraPitch = -89;
-  }
+    if (g_cameraPitch < -89) {
+      g_cameraPitch = -89;
+    }
 
-  updateLookDirection();
+    updateLookDirection();
 
-  g_lastMouseX = ev.clientX;
-  g_lastMouseY = ev.clientY;
+    g_lastMouseX = ev.clientX;
+    g_lastMouseY = ev.clientY;
 
-  ev.preventDefault();
-};
+    ev.preventDefault();
+  };
 
-canvas.onauxclick = function(ev) {
-  ev.preventDefault();
-};
+  canvas.onauxclick = function(ev) {
+    ev.preventDefault();
+  };
 
-canvas.oncontextmenu = function(ev) {
-  ev.preventDefault();
-};
+  canvas.oncontextmenu = function(ev) {
+    ev.preventDefault();
+  };
 
-document.onkeydown = function(ev) {
-  g_keys[ev.key.toLowerCase()] = true;
-};
+  document.onkeydown = function(ev) {
+    g_keys[ev.key.toLowerCase()] = true;
+  };
 
-document.onkeyup = function(ev) {
-  g_keys[ev.key.toLowerCase()] = false;
-};
+  document.onkeyup = function(ev) {
+    g_keys[ev.key.toLowerCase()] = false;
+  };
 
 }
 
@@ -370,13 +366,10 @@ function updateAnimationAngles(){
 
     g_flArmAngle = 8 * walk;
     g_frArmAngle = -8 * walk;
-
     g_blLegAngle = -3 * walk;
     g_brLegAngle = 3 * walk;
-
     g_flElbowAngle = -3 * walk;
     g_frElbowAngle = 3 * walk;
-
     g_blKneeAngle = -1.25 * walk;
     g_brKneeAngle = 1.25 * walk;
   }
@@ -444,7 +437,7 @@ function renderAllshapes(){
   var bodyTop = new Cube();
   bodyTop.color = FUR;
   bodyTop.matrix.setTranslate(0, 0.18, 0);
-  body.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
+  bodyTop.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   bodyTop.matrix.scale(0.34, 0.04, 0.54);
   bodyTop.matrix.translate(-0.5, -0.5, -0.5);
   bodyTop.render();
@@ -829,7 +822,6 @@ function renderAllshapes(){
   brShin.matrix.translate(-0.5, -1.25, -1.35);
   brShin.render();
 
-
   const CLAW = [0.95, 0.92, 0.85, 1.0];
 
   function drawClaws(parentMat, armLength, zOffset, xShift){
@@ -844,19 +836,14 @@ function renderAllshapes(){
       claw.render();
     }
   }
-
   drawClaws(flHandMat, 0.08, 0.02, 0);
   drawClaws(frHandMat, 0.08, 0.02, 0);
-  drawClaws(blAnkleMat, 0.18, -0.06, 0.02);   // shift right (toward center)
-  drawClaws(brAnkleMat, 0.18, -0.06, -0.02);  // shift left (toward center)
-  
-
+  drawClaws(blAnkleMat, 0.18, -0.06, 0.02); 
+  drawClaws(brAnkleMat, 0.18, -0.06, -0.02);
 
   var duration = performance.now() - startTime;
   sendTextToHTML("ms: " + Math.floor(duration) + " fps: " + Math.floor(1000/duration), "numdot");
 }
-
-
 
 // Set the text of a HTML element
 function sendTextToHTML(text, htmlID) {
