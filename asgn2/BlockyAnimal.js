@@ -19,8 +19,6 @@ var FSHADER_SOURCE = `
     gl_FragColor = u_FragColor;
   }`;
 
-
-
 let canvas; 
 let gl; 
 let a_Position;
@@ -109,7 +107,6 @@ function connectVariablesToGLSL(){
 
 
 } 
-
 
 let g_flArmAngle = 0;  
 let g_frArmAngle = 0;   
@@ -209,10 +206,8 @@ function addActionsForHtmIUI(){
     }
 
     updateLookDirection();
-
     g_lastMouseX = ev.clientX;
     g_lastMouseY = ev.clientY;
-
     ev.preventDefault();
   };
 
@@ -301,18 +296,18 @@ function cameraHelper(){
   updateLookDirection();
 }
 
-function updateLookDirection() {
-  let yawRad = g_cameraYaw * Math.PI / 180;
-  let pitchRad = g_cameraPitch * Math.PI / 180;
+  function updateLookDirection() {
+    let yawRad = g_cameraYaw * Math.PI / 180;
+    let pitchRad = g_cameraPitch * Math.PI / 180;
 
-  let dirX = Math.cos(pitchRad) * Math.cos(yawRad);
-  let dirY = Math.sin(pitchRad);
-  let dirZ = Math.cos(pitchRad) * Math.sin(yawRad);
+    let dirX = Math.cos(pitchRad) * Math.cos(yawRad);
+    let dirY = Math.sin(pitchRad);
+    let dirZ = Math.cos(pitchRad) * Math.sin(yawRad);
 
-  g_lookX = g_cameraX + dirX;
-  g_lookY = g_cameraY + dirY;
-  g_lookZ = g_cameraZ + dirZ;
-}
+    g_lookX = g_cameraX + dirX;
+    g_lookY = g_cameraY + dirY;
+    g_lookZ = g_cameraZ + dirZ;
+  }
 
 
 function main() {
