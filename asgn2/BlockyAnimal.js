@@ -296,18 +296,18 @@ function cameraHelper(){
   updateLookDirection();
 }
 
-  function updateLookDirection() {
-    let yawRad = g_cameraYaw * Math.PI / 180;
-    let pitchRad = g_cameraPitch * Math.PI / 180;
+function updateLookDirection() {
+  let yawRad = g_cameraYaw * Math.PI / 180;
+  let pitchRad = g_cameraPitch * Math.PI / 180;
 
-    let dirX = Math.cos(pitchRad) * Math.cos(yawRad);
-    let dirY = Math.sin(pitchRad);
-    let dirZ = Math.cos(pitchRad) * Math.sin(yawRad);
+  let dirX = Math.cos(pitchRad) * Math.cos(yawRad);
+  let dirY = Math.sin(pitchRad);
+  let dirZ = Math.cos(pitchRad) * Math.sin(yawRad);
 
-    g_lookX = g_cameraX + dirX;
-    g_lookY = g_cameraY + dirY;
-    g_lookZ = g_cameraZ + dirZ;
-  }
+  g_lookX = g_cameraX + dirX;
+  g_lookY = g_cameraY + dirY;
+  g_lookZ = g_cameraZ + dirZ;
+}
 
 
 function main() {
