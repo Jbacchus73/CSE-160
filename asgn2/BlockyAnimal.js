@@ -142,6 +142,8 @@ let g_pokeBodyAngle = 0;
 
 function addActionsForHtmIUI(){
 
+  document.getElementById('angleSlide').addEventListener('input', function() { g_globalAngle = this.value; renderAllshapes(); });
+
   document.getElementById('flArmSlide').addEventListener('input', function() { g_flArmAngle  = +this.value; renderAllshapes(); });
   document.getElementById('flElbowSlide').addEventListener('input', function() { g_flElbowAngle  = +this.value; renderAllshapes(); });
   document.getElementById('flHandSlide').addEventListener('input', function() { g_flHandAngle  = +this.value; renderAllshapes(); });
