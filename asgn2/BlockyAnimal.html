@@ -33,71 +33,36 @@
   Look Around: Hold <b>Middle Mouse</b> and drag
   </p>
 
-  <p>Shift + Click: Trigger poke animation</p>
+  <p>Shift + Click: To Poke the Sloth</p>
 
   <p>
     Camera Angle: 
     <input type="range" min="0" max="360" value="5" class="slider" id="angleSlide">
   </p>
 
+  <h4>Front-Left Arm</h4>
+  <p>Shoulder: <input type="range" min="-15" max="15" value="0" id="flArmSlide"></p>
+  <p>Elbow: <input type="range"  min="-15" max="30" value="0" id="flElbowSlide"></p>
+  <p>Hand: <input type="range" min="-45" max="30" value="0" id="flHandSlide"></p>
+
+  <h4>Front-Right Arm</h4>
+  <p>Shoulder: <input type="range" min="-15" max="15" value="0" id="frArmSlide"></p>
+  <p>Elbow: <input type="range" min="-15" max="30" value="0" id="frElbowSlide"></p>
+  <p>Hand: <input type="range" min="-45" max="30" value="0" id="frHandSlide"></p>
+
+  <h4>Back-Left Leg</h4>
+  <p>Hip: <input type="range" min="-5" max="30" value="0" id="blLegSlide"></p>
+  <p>Knee: <input type="range" min="-30" max="15" value="0" id="blKneeSlide"></p>
+  <h4>Back-Right Leg</h4>
+  <p>Hip: <input type="range" min="-5" max="30" value="0" id="brLegSlide"></p>
+  <p>Knee: <input type="range" min="-30" max="15" value="0" id="brKneeSlide"></p>
+
+
   Animation:
   <button type="button" id="animationYellowOnButton">ON</button>
   <button type="button" id="animationYellowOffButton">OFF</button>
 
-  <h3>Left Arm</h3>
-  <p>
-    Upper Arm
-    <input type="range" min="-45" max="45" value="0" class="slider" id="flUpperSlide">
-  </p>
-  <p>
-    Forearm
-    <input type="range" min="-60" max="60" value="0" class="slider" id="flForeSlide">
-  </p>
-  <p>
-    Claws / Hand
-    <input type="range" min="-45" max="45" value="0" class="slider" id="flClawSlide">
-  </p>
-  <h3>Right Arm</h3>
-  <p>
-    Upper Arm
-    <input type="range" min="-45" max="45" value="0" class="slider" id="frUpperSlide">
-  </p>
-  <p>
-    Forearm
-    <input type="range" min="-60" max="60" value="0" class="slider" id="frForeSlide">
-  </p>
-  <p>
-    Claws / Hand
-    <input type="range" min="-45" max="45" value="0" class="slider" id="frClawSlide">
-  </p>
-  <h3>Left Leg</h3>
-  <p>
-    Upper Leg
-    <input type="range" min="-45" max="45" value="0" class="slider" id="blUpperSlide">
-  </p>
-  <p>
-    Lower Leg
-    <input type="range" min="-60" max="60" value="0" class="slider" id="blForeSlide">
-  </p>
-  <p>
-    Claws / Foot
-    <input type="range" min="-45" max="45" value="0" class="slider" id="blClawSlide">
-  </p>
-  <h3>Right Leg</h3>
-  <p>
-    Upper Leg
-    <input type="range" min="-45" max="45" value="0" class="slider" id="brUpperSlide">
-  </p>
-  <p>
-    Lower Leg
-    <input type="range" min="-60" max="60" value="0" class="slider" id="brForeSlide">
-  </p>
-  <p>
-    Claws / Foot
-    <input type="range" min="-45" max="45" value="0" class="slider" id="brClawSlide">
-  </p>
-  </div>
-
+  <button type="button" id="envToggle">Toggle Environment</button>
 
   <script src="lib/webgl-utils.js"></script>
   <script src="lib/webgl-debug.js"></script>

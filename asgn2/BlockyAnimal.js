@@ -30,6 +30,10 @@ let u_ModelMatrix;
 let u_GlobalRotateMatrix;
 let u_ViewMatrix;
 let u_ProjectionMatrix;
+ 
+let g_showEnvironment = true;
+let g_animationOn = false;
+let g_headBob = 0;
 
 let g_keys = {};
 let g_cameraX = 0;
@@ -38,7 +42,6 @@ let g_cameraZ = 3.0;
 let g_lookX = 0;
 let g_lookY = 0;
 let g_lookZ = 0;
-let g_cameraSpeed = 0.08;
 
 function setupWebGL(){
   // Retrieve <canvas> element
@@ -108,45 +111,72 @@ function connectVariablesToGLSL(){
 } 
 
 
+let g_flArmAngle = 0;  
+let g_frArmAngle = 0;   
+let g_blLegAngle = 0;   
+let g_brLegAngle = 0;   
+
+let g_flElbowAngle = 0;
+let g_frElbowAngle = 0;
+let g_blKneeAngle = 0;
+let g_brKneeAngle = 0;
+
+let g_flHandAngle = 0;
+let g_frHandAngle = 0;
+
+
 let g_globalAngle = 0;
-let g_yellowAngle = 0; 
-let g_magentaAngle = 0;
-let g_clawAngle = 0;
-let g_yellowAnimation = false;
+
+
 let g_globalAngleY = 0;
 let g_mouseDragging = false;
 let g_lastMouseX = 0;
 let g_lastMouseY = 0;
-let g_maxPitch = 80;
 let g_cameraYaw = -90;
 let g_cameraPitch = 0;
 let g_mouseSensitivity = 0.25;
 
-let grassBlades = [];
-
-for (let i = 0; i < 500; i++) {
-  grassBlades.push({
-    x: -2.4 + Math.random() * 4.8,
-    z: -2.4 + Math.random() * 4.8,
-    h: 0.04 + Math.random() * 0.08,
-    r: Math.random() * 40 - 20,
-    shade: 0.55 + Math.random() * 0.25
-  });
-}
-
+let g_pokeAnimation = false;
+let g_pokeStartTime = 0;
+let g_pokeHeadAngle = 0;
+let g_pokeArmAngle = 0;
+let g_pokeBodyAngle = 0;
 
 function addActionsForHtmIUI(){
-  //Color Slider Events
 
-  document.getElementById('animationYellowOffButton').onclick = function() {g_yellowAnimation=false;};
-  document.getElementById('animationYellowOnButton').onclick = function() {g_yellowAnimation=true;};
-  document.getElementById('magentaSlide').addEventListener('input', function() { g_magentaAngle = this.value; renderAllshapes(); });
-  document.getElementById('yellowSlide').addEventListener('input', function() { g_yellowAngle = this.value; renderAllshapes(); });
-  document.getElementById('angleSlide').addEventListener('input', function() { g_globalAngle = this.value; renderAllshapes(); });
+  document.getElementById('flArmSlide').addEventListener('input', function() { g_flArmAngle  = +this.value; renderAllshapes(); });
+  document.getElementById('flElbowSlide').addEventListener('input', function() { g_flElbowAngle  = +this.value; renderAllshapes(); });
+  document.getElementById('flHandSlide').addEventListener('input', function() { g_flHandAngle  = +this.value; renderAllshapes(); });
+
+  document.getElementById('frArmSlide').addEventListener('input', function() { g_frArmAngle  = +this.value; renderAllshapes(); });
+  document.getElementById('frElbowSlide').addEventListener('input', function() { g_frElbowAngle  = +this.value; renderAllshapes(); });
+  document.getElementById('frHandSlide').addEventListener('input', function() { g_frHandAngle  = +this.value; renderAllshapes(); });
+
+  document.getElementById('blLegSlide').addEventListener('input', function() { g_blLegAngle  = +this.value; renderAllshapes(); });
+  document.getElementById('blKneeSlide').addEventListener('input', function() { g_blKneeAngle  = +this.value; renderAllshapes(); });
+
+  document.getElementById('brLegSlide').addEventListener('input', function() { g_brLegAngle = +this.value; renderAllshapes(); });
+  document.getElementById('brKneeSlide').addEventListener('input', function() { g_brKneeAngle = +this.value; renderAllshapes(); });
+
+  document.getElementById('envToggle').onclick = function() { g_showEnvironment = !g_showEnvironment; };
+
+  document.getElementById('animationYellowOnButton').onclick = function() { g_animationOn = true; };
+
+  document.getElementById('animationYellowOffButton').onclick = function() { g_animationOn = false; };
+
+
 
   // Camera Controls 
 
   canvas.onmousedown = function(ev) {
+
+  if (ev.shiftKey) {
+  g_pokeAnimation = true;
+  g_pokeStartTime = g_seconds;
+  ev.preventDefault();
+  return;
+}
+
   if (ev.button === 1) {               
     g_mouseDragging = true;
     g_lastMouseX = ev.clientX;
@@ -312,12 +342,60 @@ function tick(){
   g_seconds = performance.now()/1000.0 - g_startTime;
 
   cameraHelper(); 
+  updateAnimationAngles();
   renderAllshapes();
   requestAnimationFrame(tick); 
 }
 
 function updateAnimationAngles(){
+  if (g_pokeAnimation) {
+    let t = g_seconds - g_pokeStartTime;
 
+    g_pokeHeadAngle = -8 * Math.sin(t * 10) * Math.exp(-2.8 * t);
+    g_pokeArmAngle = 12 * Math.sin(t * 8) * Math.exp(-2.6 * t);
+    g_pokeBodyAngle = 3 * Math.sin(t * 9) * Math.exp(-2.8 * t);
+
+    if (t > 2.0) {
+      g_pokeAnimation = false;
+      g_pokeHeadAngle = 0;
+      g_pokeArmAngle = 0;
+      g_pokeBodyAngle = 0;
+    }
+  }
+
+  if (g_animationOn) {
+    let walk = Math.sin(g_seconds * 1.4);
+
+    g_headBob = 1.5 * Math.sin(g_seconds * 1.4);
+
+    g_flArmAngle = 8 * walk;
+    g_frArmAngle = -8 * walk;
+
+    g_blLegAngle = -3 * walk;
+    g_brLegAngle = 3 * walk;
+
+    g_flElbowAngle = -3 * walk;
+    g_frElbowAngle = 3 * walk;
+
+    g_blKneeAngle = -1.25 * walk;
+    g_brKneeAngle = 1.25 * walk;
+  }
+  else {
+    g_headBob = 0;
+  }
+}
+
+let rocks = [];
+for (let i = 0; i < 100; i++) {
+  rocks.push({
+    x: -4.6 + Math.random() * 9.2,
+    z: -4.6 + Math.random() * 9.2,
+    sx: 0.08 + Math.random() * 0.14,
+    sy: 0.04 + Math.random() * 0.08,
+    sz: 0.08 + Math.random() * 0.14,
+    r: Math.random() * 360,
+    shade: 0.25 + Math.random() * 0.25
+  });
 }
 
 function renderAllshapes(){
@@ -331,36 +409,34 @@ function renderAllshapes(){
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+ if (g_showEnvironment) {
   var ground = new Cube();
   ground.color = [0.18, 0.42, 0.12, 1.0];
   ground.matrix.setTranslate(0, -0.27, 0);
-  ground.matrix.scale(5.0, 0.08, 5.0);
+  ground.matrix.scale(10.0, 0.08, 10.0);
   ground.matrix.translate(-0.5, -0.5, -0.5);
   ground.render();
 
-  for (let i = 0; i < grassBlades.length; i++) {
-  var blade = new Cube();
+  for (let i = 0; i < rocks.length; i++) {
+  var rock = new Cube();
 
-  let shade = grassBlades[i].shade;
-  blade.color = [0.45, shade, 0.28, 1.0];
+  let shade = rocks[i].shade;
+  rock.color = [shade, shade, shade * 0.95, 1.0];
 
-  blade.matrix.setTranslate(
-    grassBlades[i].x,
-    -0.22,
-    grassBlades[i].z
-  );
-
-  blade.matrix.rotate(grassBlades[i].r, 0, 0, 1);
-  blade.matrix.scale(0.012, grassBlades[i].h, 0.012);
-  blade.matrix.translate(-0.5, -0.5, -0.5);
-  blade.render();
-}
+  rock.matrix.setTranslate(rocks[i].x, -0.21, rocks[i].z);
+  rock.matrix.rotate(rocks[i].r, 0, 1, 0);
+  rock.matrix.rotate(15, 0, 0, 1);
+  rock.matrix.scale(rocks[i].sx, rocks[i].sy, rocks[i].sz);
+  rock.matrix.translate(-0.5, -0.5, -0.5);
+  rock.render();
+  }
+ }
 
   const FUR = [0.55, 0.42, 0.30, 1.0];
-
   var body = new Cube();
   body.color = FUR;
   body.matrix.setTranslate(0, 0, 0);
+  body.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   body.matrix.scale(0.4, 0.35, 0.6);
   body.matrix.translate(-0.5, -0.5, -0.5);
   body.render();
@@ -368,6 +444,7 @@ function renderAllshapes(){
   var bodyTop = new Cube();
   bodyTop.color = FUR;
   bodyTop.matrix.setTranslate(0, 0.18, 0);
+  body.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   bodyTop.matrix.scale(0.34, 0.04, 0.54);
   bodyTop.matrix.translate(-0.5, -0.5, -0.5);
   bodyTop.render();
@@ -375,6 +452,7 @@ function renderAllshapes(){
   var bodyCrown = new Cube();
   bodyCrown.color = FUR;
   bodyCrown.matrix.setTranslate(0, 0.21, 0);
+  bodyCrown.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   bodyCrown.matrix.scale(0.28, 0.03, 0.48);
   bodyCrown.matrix.translate(-0.5, -0.5, -0.5);
   bodyCrown.render();
@@ -382,6 +460,7 @@ function renderAllshapes(){
   var bodyBottom = new Cube();
   bodyBottom.color = FUR;
   bodyBottom.matrix.setTranslate(0, -0.18, 0);
+  bodyBottom.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   bodyBottom.matrix.scale(0.34, 0.04, 0.54);
   bodyBottom.matrix.translate(-0.5, -0.5, -0.5);
   bodyBottom.render();
@@ -389,6 +468,7 @@ function renderAllshapes(){
   var bodyKeel = new Cube();
   bodyKeel.color = FUR;
   bodyKeel.matrix.setTranslate(0, -0.21, 0);
+  bodyKeel.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   bodyKeel.matrix.scale(0.28, 0.03, 0.48);
   bodyKeel.matrix.translate(-0.5, -0.5, -0.5);
   bodyKeel.render();
@@ -396,6 +476,7 @@ function renderAllshapes(){
   var bodyLeft = new Cube();
   bodyLeft.color = FUR;
   bodyLeft.matrix.setTranslate(-0.2, 0, 0);
+  bodyLeft.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   bodyLeft.matrix.scale(0.04, 0.3, 0.54);
   bodyLeft.matrix.translate(-0.5, -0.5, -0.5);
   bodyLeft.render();
@@ -403,6 +484,7 @@ function renderAllshapes(){
   var bodyRight = new Cube();
   bodyRight.color = FUR;
   bodyRight.matrix.setTranslate(0.2, 0, 0);
+  bodyRight.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   bodyRight.matrix.scale(0.04, 0.3, 0.54);
   bodyRight.matrix.translate(-0.5, -0.5, -0.5);
   bodyRight.render();
@@ -410,6 +492,7 @@ function renderAllshapes(){
   var bodyFront = new Cube();
   bodyFront.color = FUR;
   bodyFront.matrix.setTranslate(0, 0, 0.29);
+  bodyFront.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   bodyFront.matrix.scale(0.34, 0.3, 0.04);
   bodyFront.matrix.translate(-0.5, -0.5, -0.5);
   bodyFront.render();
@@ -417,6 +500,7 @@ function renderAllshapes(){
   var bodyBack = new Cube();
   bodyBack.color = FUR;
   bodyBack.matrix.setTranslate(0, 0, -0.29);
+  bodyBack.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   bodyBack.matrix.scale(0.34, 0.3, 0.04);
   bodyBack.matrix.translate(-0.5, -0.5, -0.5);
   bodyBack.render();
@@ -424,6 +508,7 @@ function renderAllshapes(){
   var neck = new Cube(); 
   neck.color = FUR; 
   neck.matrix.setTranslate(0, -0.03, 0.28); 
+  neck.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   neck.matrix.scale(0.28, 0.28, 0.2); 
   neck.matrix.translate(-0.5,-0.5,-0.5);
   neck.render(); 
@@ -432,6 +517,7 @@ function renderAllshapes(){
   tail.color = FUR; 
   tail.matrix.setTranslate(0, -0.01, -0.3); 
   tail.matrix.rotate(-30,1,0,0); 
+  tail.matrix.rotate(g_pokeBodyAngle, 0, 0, 1);
   tail.matrix.scale(0.13, 0.1, 0.2); 
   tail.matrix.translate(-0.5,-0.5,-0.5);
   tail.render(); 
@@ -439,6 +525,7 @@ function renderAllshapes(){
   var belly = new Cube(); 
   belly.color = [0.72, 0.64, 0.55, 1.0];
   belly.matrix.setTranslate(0, -0.21, 0);
+  belly.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   belly.matrix.scale(0.32, 0.04, 0.5);
   belly.matrix.translate(-0.5,-0.5,-0.5);
   belly.render(); 
@@ -446,6 +533,7 @@ function renderAllshapes(){
   var flShoulder = new Cube(); 
   flShoulder.color = FUR; 
   flShoulder.matrix.setTranslate(-0.16, 0.08, 0.15);
+  flShoulder.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   flShoulder.matrix.scale(.14,.14,.14); 
   flShoulder.matrix.translate(-0.5,-0.5,-0.5);
   flShoulder.render(); 
@@ -453,6 +541,7 @@ function renderAllshapes(){
   var frShoulder = new Cube(); 
   frShoulder.color = FUR; 
   frShoulder.matrix.setTranslate(0.16, 0.08, 0.15);
+  frShoulder.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   frShoulder.matrix.scale(.14,.14,.14); 
   frShoulder.matrix.translate(-0.5,-0.5,-0.5);
   frShoulder.render();
@@ -460,6 +549,7 @@ function renderAllshapes(){
   var blHip = new Cube(); 
   blHip.color = FUR; 
   blHip.matrix.setTranslate(-0.16, 0.08, -0.15);
+  blHip.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   blHip.matrix.scale(.14,.14,.14); 
   blHip.matrix.translate(-0.5,-0.5,-0.5);
   blHip.render();
@@ -467,6 +557,7 @@ function renderAllshapes(){
   var brHip = new Cube(); 
   brHip.color = FUR; 
   brHip.matrix.setTranslate(0.16, 0.08, -0.15);
+  brHip.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
   brHip.matrix.scale(.14,.14,.14); 
   brHip.matrix.translate(-0.5,-0.5,-0.5);
   brHip.render();
@@ -474,6 +565,7 @@ function renderAllshapes(){
   var head = new Cube(); 
   head.color = FUR; 
   head.matrix.setTranslate(0, -0.02, 0.5);
+  head.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   head.matrix.scale(0.42, 0.38, 0.3);
   head.matrix.translate(-0.5, -0.5, -0.5);
   head.render();
@@ -481,6 +573,7 @@ function renderAllshapes(){
   var headTop = new Cube(); 
   headTop.color = FUR; 
   headTop.matrix.setTranslate(0, 0.18, 0.5);
+  headTop.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   headTop.matrix.scale(0.36, 0.04, 0.26);
   headTop.matrix.translate(-0.5, -0.5, -0.5);
   headTop.render();
@@ -488,6 +581,7 @@ function renderAllshapes(){
   var headCrown = new Cube();
   headCrown.color = FUR;
   headCrown.matrix.setTranslate(0, 0.21, 0.5);
+  headCrown.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   headCrown.matrix.scale(0.28, 0.03, 0.2);
   headCrown.matrix.translate(-0.5, -0.5, -0.5);
   headCrown.render();
@@ -495,6 +589,7 @@ function renderAllshapes(){
   var headBottom = new Cube();
   headBottom.color = FUR;
   headBottom.matrix.setTranslate(0, -0.22, 0.5);
+  headBottom.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   headBottom.matrix.scale(0.36, 0.04, 0.26);
   headBottom.matrix.translate(-0.5, -0.5, -0.5);
   headBottom.render();
@@ -502,6 +597,7 @@ function renderAllshapes(){
   var headChin = new Cube();
   headChin.color = FUR;
   headChin.matrix.setTranslate(0, -0.25, 0.5);
+  headChin.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   headChin.matrix.scale(0.28, 0.03, 0.2);
   headChin.matrix.translate(-0.5, -0.5, -0.5);
   headChin.render();
@@ -509,6 +605,7 @@ function renderAllshapes(){
   var headLeft = new Cube();
   headLeft.color = FUR;
   headLeft.matrix.setTranslate(-0.21, -0.02, 0.5);
+  headLeft.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   headLeft.matrix.scale(0.04, 0.32, 0.26);
   headLeft.matrix.translate(-0.5, -0.5, -0.5);
   headLeft.render();
@@ -516,6 +613,7 @@ function renderAllshapes(){
   var headRight = new Cube();
   headRight.color = FUR;
   headRight.matrix.setTranslate(0.21, -0.02, 0.5);
+  headRight.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   headRight.matrix.scale(0.04, 0.32, 0.26);
   headRight.matrix.translate(-0.5, -0.5, -0.5);
   headRight.render();
@@ -523,6 +621,7 @@ function renderAllshapes(){
   var face = new Cube();
   face.color = [0.85, 0.73, 0.58, 1.0];
   face.matrix.setTranslate(0, -0.02, 0.651);
+  face.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   face.matrix.scale(0.38, 0.32, 0.01);  
   face.matrix.translate(-0.5, -0.5, -0.5);
   face.render();
@@ -530,6 +629,7 @@ function renderAllshapes(){
   var eyeBand = new Cube(); 
   eyeBand.color = [0.18, 0.12, 0.08, 1.0];
   eyeBand.matrix.setTranslate(0, 0.045, 0.66);
+  eyeBand.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   eyeBand.matrix.scale(0.34, 0.085, 0.012);
   eyeBand.matrix.translate(-0.5, -0.5, -0.5);
   eyeBand.render();
@@ -537,6 +637,7 @@ function renderAllshapes(){
   var chinPatch = new Cube();
   chinPatch.color = [0.78, 0.66, 0.52, 1.0];
   chinPatch.matrix.setTranslate(0, -0.148, 0.665);
+  chinPatch.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   chinPatch.matrix.scale(0.22, 0.08, 0.012);
   chinPatch.matrix.translate(-0.5, -0.5, -0.5);
   chinPatch.render();
@@ -545,6 +646,7 @@ function renderAllshapes(){
   lStreak.color = [0.18, 0.12, 0.08, 1.0];
   lStreak.matrix.setTranslate(-0.105, -0.05, 0.665);
   lStreak.matrix.rotate(-22, 0, 0, 1);
+  lStreak.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   lStreak.matrix.scale(0.055, 0.25, 0.012);
   lStreak.matrix.translate(-0.5, -0.5, -0.5);
   lStreak.render();
@@ -553,6 +655,7 @@ function renderAllshapes(){
   rStreak.color = [0.18, 0.12, 0.08, 1.0];
   rStreak.matrix.setTranslate(0.105, -0.05, 0.665);
   rStreak.matrix.rotate(22, 0, 0, 1);
+  rStreak.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   rStreak.matrix.scale(0.055, 0.25, 0.012);
   rStreak.matrix.translate(-0.5, -0.5, -0.5);
   rStreak.render();
@@ -560,6 +663,7 @@ function renderAllshapes(){
   var lEye = new Cube();
   lEye.color = [0.03, 0.02, 0.015, 1.0];
   lEye.matrix.setTranslate(-0.085, 0.045, 0.674);
+  lEye.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   lEye.matrix.scale(0.055, 0.055, 0.01);
   lEye.matrix.translate(-0.5, -0.5, -0.5);
   lEye.render();
@@ -567,6 +671,7 @@ function renderAllshapes(){
   var rEye = new Cube();
   rEye.color = [0.03, 0.02, 0.015, 1.0];
   rEye.matrix.setTranslate(0.085, 0.045, 0.674);
+  rEye.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   rEye.matrix.scale(0.055, 0.055, 0.01);
   rEye.matrix.translate(-0.5, -0.5, -0.5);
   rEye.render();
@@ -574,6 +679,7 @@ function renderAllshapes(){
   var lShine = new Cube(); 
   lShine.color = [1.0, 1.0, 1.0, 1.0];
   lShine.matrix.setTranslate(-0.073, 0.057, 0.681);
+  lShine.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   lShine.matrix.scale(0.014, 0.016, 0.006);
   lShine.matrix.translate(-0.5, -0.5, -0.5);
   lShine.render();
@@ -581,6 +687,7 @@ function renderAllshapes(){
   var rShine = new Cube();
   rShine.color = [1.0, 1.0, 1.0, 1.0];
   rShine.matrix.setTranslate(0.097, 0.057, 0.681);
+  rShine.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   rShine.matrix.scale(0.014, 0.016, 0.006);
   rShine.matrix.translate(-0.5, -0.5, -0.5);
   rShine.render();
@@ -589,6 +696,7 @@ function renderAllshapes(){
   snout.color = [0.30, 0.22, 0.16, 1.0];
   snout.matrix.setTranslate(0, -0.08, 0.69);
   snout.matrix.rotate(12, 1, 0, 0);
+  snout.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   snout.matrix.scale(0.17, 0.11, 0.08);
   snout.matrix.translate(-0.5, -0.5, -0.5);
   snout.render();
@@ -596,6 +704,7 @@ function renderAllshapes(){
   var mouth = new Cube(); 
   mouth.color = [0.05, 0.03, 0.02, 1.0];
   mouth.matrix.setTranslate(0, -0.105, 0.735);
+  mouth.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   mouth.matrix.scale(0.13, 0.035, 0.01);
   mouth.matrix.translate(-0.5, -0.5, -0.5);
   mouth.render();
@@ -603,6 +712,7 @@ function renderAllshapes(){
   var lNostril = new Cube();
   lNostril.color = [0.04, 0.025, 0.015, 1.0];
   lNostril.matrix.setTranslate(-0.03, -0.04, 0.738);
+  lNostril.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   lNostril.matrix.scale(0.025, 0.04, 0.008);
   lNostril.matrix.translate(-0.5, -0.5, -0.5);
   lNostril.render();
@@ -610,14 +720,16 @@ function renderAllshapes(){
   var rNostril = new Cube();
   rNostril.color = [0.04, 0.025, 0.015, 1.0];
   rNostril.matrix.setTranslate(0.03, -0.04, 0.738);
+  rNostril.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
   rNostril.matrix.scale(0.025, 0.04, 0.008);
   rNostril.matrix.translate(-0.5, -0.5, -0.5);
   rNostril.render();
 
-  var flUpper = new Cube(); 
-  flUpper.color = FUR; 
+  var flUpper = new Cube();
+  flUpper.color = FUR;
   flUpper.matrix.setTranslate(-0.15, 0.1, 0.15);
   flUpper.matrix.rotate(-35, 0, 0, 1);
+  flUpper.matrix.rotate(g_flArmAngle - g_pokeArmAngle, 1, 0, 0);
   var flElbowMat = new Matrix4(flUpper.matrix);
   flUpper.matrix.scale(0.11, 0.35, 0.175);
   flUpper.matrix.translate(-0.5, -1.0, -0.5);
@@ -627,17 +739,28 @@ function renderAllshapes(){
   flFore.color = FUR;
   flFore.matrix = flElbowMat;
   flFore.matrix.translate(-0.03, -0.25, 0);
-  flFore.matrix.rotate(-75, 1, 0, 0);
+  flFore.matrix.rotate(-75 + g_flElbowAngle + g_pokeArmAngle * 0.4, 1, 0, 0);
   flFore.matrix.translate(0.03, 0, 0);
-  var flHandMat = new Matrix4(flFore.matrix);
+  var flWristMat = new Matrix4(flFore.matrix);
   flFore.matrix.scale(0.1, 0.35, 0.15);
   flFore.matrix.translate(-0.5, -1.0, -0.5);
   flFore.render();
+
+  var flHand = new Cube();
+  flHand.color = FUR;
+  flHand.matrix = flWristMat;
+  flHand.matrix.translate(0, -0.35, 0);
+  flHand.matrix.rotate(g_flHandAngle, 1, 0, 0);
+  var flHandMat = new Matrix4(flHand.matrix);
+  flHand.matrix.scale(0.13, 0.08, 0.08);
+  flHand.matrix.translate(-0.5, -1.0, -0.3);
+  flHand.render();
 
   var frUpper = new Cube();
   frUpper.color = FUR;
   frUpper.matrix.setTranslate(0.15, 0.1, 0.15);
   frUpper.matrix.rotate(35, 0, 0, 1);
+  frUpper.matrix.rotate(g_frArmAngle - g_pokeArmAngle, 1, 0, 0);
   var frElbowMat = new Matrix4(frUpper.matrix);
   frUpper.matrix.scale(0.11, 0.35, 0.175);
   frUpper.matrix.translate(-0.5, -1.0, -0.5);
@@ -647,72 +770,85 @@ function renderAllshapes(){
   frFore.color = FUR;
   frFore.matrix = frElbowMat;
   frFore.matrix.translate(0.03, -0.25, 0);
-  frFore.matrix.rotate(-75, 1, 0, 0);
+  frFore.matrix.rotate(-75 + g_frElbowAngle + g_pokeArmAngle * 0.4, 1, 0, 0);
   frFore.matrix.translate(-0.03, 0, 0);
-  var frHandMat = new Matrix4(frFore.matrix);
+  var frWristMat = new Matrix4(frFore.matrix);
   frFore.matrix.scale(0.1, 0.35, 0.15);
   frFore.matrix.translate(-0.5, -1.0, -0.5);
   frFore.render();
 
-  var blUppper = new Cube();
-  blUppper.color = FUR;
-  blUppper.matrix.setTranslate(-0.15, 0.1, -0.18);
-  blUppper.matrix.rotate(-35, 0, 0, 1);
-  var blElbowMat = new Matrix4(blUppper.matrix);
-  blUppper.matrix.scale(0.11, 0.35, 0.175);
-  blUppper.matrix.translate(-0.5, -1.0, -0.5);
-  blUppper.render();
+  var frHand = new Cube();
+  frHand.color = FUR;
+  frHand.matrix = frWristMat;
+  frHand.matrix.translate(0, -0.35, 0);
+  frHand.matrix.rotate(g_frHandAngle, 1, 0, 0);
+  var frHandMat = new Matrix4(frHand.matrix);
+  frHand.matrix.scale(0.13, 0.08, 0.08);
+  frHand.matrix.translate(-0.5, -1.0, -0.3);
+  frHand.render();
 
-  var blFore = new Cube();
-  blFore.color = FUR;
-  blFore.matrix = blElbowMat;
-  blFore.matrix.translate(0.03, -0.25, 0);
-  blFore.matrix.rotate(-60, 1, 0, 0);
-  blFore.matrix.translate(-0.03, 0, 0);
-  var blHandMat = new Matrix4(blFore.matrix);
-  blFore.matrix.scale(0.1, 0.15, 0.15);
-  blFore.matrix.translate(-0.5, -1.0, -0.5);
-  blFore.render();
+  var blUpper = new Cube();
+  blUpper.color = FUR;
+  blUpper.matrix.setTranslate(-0.15, 0.1, -0.18);
+  blUpper.matrix.rotate(-35, 0, 0, 1);
+  blUpper.matrix.rotate(g_blLegAngle + g_pokeArmAngle * 0.5, 1, 0, 0);
+  var blKneeMat = new Matrix4(blUpper.matrix);
+  blUpper.matrix.scale(0.11, 0.35, 0.175);
+  blUpper.matrix.translate(-0.5, -1.0, -0.5);
+  blUpper.render();
+
+  var blShin = new Cube();
+  blShin.color = FUR;
+  blShin.matrix = blKneeMat;
+  blShin.matrix.translate(0.03, -0.25, 0);
+  blShin.matrix.rotate(-80 + g_blKneeAngle, 1, 0, 0);
+  blShin.matrix.translate(-0.03, 0, 0);
+  var blAnkleMat = new Matrix4(blShin.matrix);
+  blShin.matrix.scale(0.1, 0.15, 0.07);
+  blShin.matrix.translate(-0.5, -1.25, -1.35);
+  blShin.render();
 
   var brUpper = new Cube();
   brUpper.color = FUR;
   brUpper.matrix.setTranslate(0.15, 0.1, -0.18);
   brUpper.matrix.rotate(35, 0, 0, 1);
-  var brElbowMat = new Matrix4(brUpper.matrix);
+  brUpper.matrix.rotate(g_brLegAngle + g_pokeArmAngle * 0.5, 1, 0, 0);
+  var brKneeMat = new Matrix4(brUpper.matrix);
   brUpper.matrix.scale(0.11, 0.35, 0.175);
   brUpper.matrix.translate(-0.5, -1.0, -0.5);
   brUpper.render();
 
-  var brFore = new Cube();
-  brFore.color = FUR;
-  brFore.matrix = brElbowMat;
-  brFore.matrix.translate(0.03, -0.25, 0);
-  brFore.matrix.rotate(-60, 1, 0, 0);
-  brFore.matrix.translate(-0.03, 0, 0);
-  var brHandMat = new Matrix4(brFore.matrix);
-  brFore.matrix.scale(0.1, 0.15, 0.15);
-  brFore.matrix.translate(-0.5, -1.0, -0.5);
-  brFore.render()
+  var brShin = new Cube();
+  brShin.color = FUR;
+  brShin.matrix = brKneeMat;
+  brShin.matrix.translate(0.03, -0.25, 0);
+  brShin.matrix.rotate(-80 + g_brKneeAngle, 1, 0, 0);
+  brShin.matrix.translate(-0.03, 0, 0);
+  var brAnkleMat = new Matrix4(brShin.matrix);
+  brShin.matrix.scale(0.1, 0.15, 0.07);
+  brShin.matrix.translate(-0.5, -1.25, -1.35);
+  brShin.render();
+
 
   const CLAW = [0.95, 0.92, 0.85, 1.0];
 
-  function drawClaws(parentMat, armLength){
+  function drawClaws(parentMat, armLength, zOffset, xShift){
     for (let i = 0; i < 3; i++) {
       var claw = new Cone();
       claw.color = CLAW;
       claw.matrix = new Matrix4(parentMat);
-      claw.matrix.translate(-0.035 + i * 0.035, -armLength, 0.02);
+      claw.matrix.translate(-0.035 + i * 0.035 + xShift, -armLength, zOffset);
       claw.matrix.rotate(180, 1, 0, 0);
-      claw.matrix.rotate(15 + g_clawAngle, 1, 0, 0);   // ← 3rd-level joint
+      claw.matrix.rotate(15, 1, 0, 0);
       claw.matrix.scale(0.03, 0.15, 0.03);
       claw.render();
     }
   }
 
-  drawClaws(flHandMat, 0.35);
-  drawClaws(frHandMat, 0.35);
-  drawClaws(blHandMat, 0.15);
-  drawClaws(brHandMat, 0.15);
+  drawClaws(flHandMat, 0.08, 0.02, 0);
+  drawClaws(frHandMat, 0.08, 0.02, 0);
+  drawClaws(blAnkleMat, 0.18, -0.06, 0.02);   // shift right (toward center)
+  drawClaws(brAnkleMat, 0.18, -0.06, -0.02);  // shift left (toward center)
   
 
 
