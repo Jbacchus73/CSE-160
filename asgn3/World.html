@@ -6,19 +6,96 @@ jbacchus@ucsc.edu
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>BlockyWorld (1)</title>
+  <title>BlockyWorld</title>
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --game-width: 1152px;
+      --game-height: 648px;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      color: #eee;
+      background:
+        linear-gradient(to bottom,
+          #4db8ff 0%,
+          #8edcff 44%,
+          #77c957 44%,
+          #5fa33a 64%,
+          #8b5a2b 64%,
+          #4b2e17 100%
+        );
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      left: 55px;
+      top: 82px;
+      width: 120px;
+      height: 32px;
+      background: white;
+      box-shadow:
+        40px -14px 0 white,
+        80px 0 0 white,
+        650px 45px 0 white,
+        690px 30px 0 white,
+        730px 45px 0 white,
+        1080px 80px 0 white,
+        1120px 65px 0 white,
+        1160px 80px 0 white;
+      opacity: 0.8;
+      z-index: -1;
+    }
+
+    #topBar {
+      width: 100%;
+      padding: 16px 0 6px 0;
+      text-align: center;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
+
+    #topBar h1 {
+      margin: 0;
+      font-size: 34px;
+      color: white;
+      text-shadow: 2px 2px 0 #2f5f2f;
+    }
+
+    #topBar p {
+      margin: 6px 0 0 0;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: bold;
+      text-shadow: 1px 1px 0 #3b2a12;
+    }
+
     #gameContainer {
       position: relative;
-      float: left;
-      width: 800px;
-      height: 800px;
-      margin-right: 20px;
+      width: var(--game-width);
+      height: var(--game-height);
+      margin: 18px auto 14px auto;
+      background: black;
+      border: none;
+      outline: none;
+      box-shadow: none;
     }
 
     #World {
       display: block;
+      width: var(--game-width);
+      height: var(--game-height);
+      image-rendering: pixelated;
     }
 
     #reticle {
@@ -30,32 +107,32 @@ jbacchus@ucsc.edu
       transform: translate(-50%, -50%);
       pointer-events: none;
       z-index: 10;
-      opacity: 0.75;
-      background: black;
+      opacity: 0.9;
+      background: white;
+      border: 1px solid black;
       border-radius: 50%;
-      box-shadow: 0 0 3px white;
     }
 
     #pauseScreen {
       position: absolute;
       left: 0;
       top: 0;
-      width: 800px;
-      height: 800px;
-      background: rgba(0, 0, 0, 0.55);
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.62);
       color: white;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-family: Arial, sans-serif;
       z-index: 20;
       pointer-events: none;
     }
 
     #pauseScreen h1 {
-      font-size: 48px;
+      font-size: 54px;
       margin: 0 0 10px 0;
+      text-shadow: 3px 3px 0 black;
     }
 
     #pauseScreen p {
@@ -67,15 +144,14 @@ jbacchus@ucsc.edu
       position: absolute;
       left: 0;
       top: 0;
-      width: 800px;
-      height: 800px;
-      background: rgba(0, 0, 0, 0.65);
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.72);
       color: white;
       display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-family: Arial, sans-serif;
       z-index: 30;
       pointer-events: auto;
     }
@@ -83,6 +159,8 @@ jbacchus@ucsc.edu
     #winScreen h1 {
       font-size: 56px;
       margin: 0 0 10px 0;
+      color: #000000;
+      text-shadow: 3px 3px 0 black;
     }
 
     #winScreen p {
@@ -92,20 +170,89 @@ jbacchus@ucsc.edu
 
     #resetButton {
       font-size: 18px;
-      padding: 10px 22px;
+      padding: 10px 20px;
+      background: #79c957;
+      color: white;
+      border: 3px solid #335c25;
       cursor: pointer;
     }
 
+    #resetButton:hover {
+      background: #8ee066;
+    }
+
+    #bottomHud {
+      width: var(--game-width);
+      margin: 0 auto 24px auto;
+      background: rgba(29, 29, 29, 0.94);
+      border: 4px solid #444;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      padding: 10px;
+    }
+
     #controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    #controls p {
+      margin: 0;
+      min-height: 32px;
+      padding: 7px 10px;
+      background: #2b2b2b;
+      border-left: 4px solid #79c957;
+      line-height: 16px;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+    }
+
+    #controls b {
+      color: #ffffff;
+    }
+
+    #numdot {
+      font-family: monospace;
+      color: #ccc;
+      width: 150px;
+      justify-content: center;
+    }
+
+    #mouseBox {
+      width: 420px;
+      justify-content: center;
       overflow: hidden;
-      font-family: Arial, sans-serif;
+    }
+
+    #mouseStatus {
+      color: #79c957;
+      font-weight: bold;
+      display: inline-block;
+      max-width: 330px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #gameStatus {
+      color: rgb(255, 255, 255);
+      font-weight: bold;
     }
   </style>
 </head>
 
 <body onload="main()">
+  <div id="topBar">
+    <h1>BlockyWorld</h1>
+    <p>Objective: <span id="gameStatus">Find the golden tree and break it to win.</span></p>
+  </div>
+
   <div id="gameContainer">
-    <canvas id="World" width="800" height="800">
+    <canvas id="World" width="1152" height="648">
       Please use a browser that supports "canvas"
     </canvas>
 
@@ -123,48 +270,18 @@ jbacchus@ucsc.edu
     </div>
   </div>
 
-  <div id="controls">
-    <p id="numdot">FPS</p>
-
-    <h3>Controls</h3>
-
-    <p>
-      Move Camera:
-      <b>W</b> Forward,
-      <b>S</b> Backward,
-      <b>A</b> Left,
-      <b>D</b> Right
-    </p>
-
-    <p>
-      Rotate Camera:
-      <b>Q</b> Left,
-      <b>E</b> Right
-    </p>
-
-    <p>
-      Look Around: Click on the canvas to lock the mouse. Press <b>ESC</b> to pause/unlock.
-    </p>
-
-    <p>
-      Jump: <b>Space</b>
-    </p>
-
-    <p>
-      Blocks:
-      <b>Left Click</b> Delete Block,
-      <b>Right Click</b> Add Block
-    </p>
-
-    <p>
-      Mouse Status:
-      <span id="mouseStatus">Click canvas to lock camera</span>
-    </p>
-
-    <p>
-      Objective:
-      <span id="gameStatus">Find the golden tree and break it to win.</span>
-    </p>
+  <div id="bottomHud">
+    <div id="controls">
+      <p id="numdot">FPS</p>
+      <p><b>WASD</b>&nbsp;Move</p>
+      <p><b>Q / E</b>&nbsp;Rotate</p>
+      <p><b>Mouse</b>&nbsp;Look</p>
+      <p><b>ESC</b>&nbsp;Pause</p>
+      <p><b>Space</b>&nbsp;Jump</p>
+      <p><b>Left Click</b>&nbsp;Delete</p>
+      <p><b>Right Click</b>&nbsp;Add</p>
+      <p id="mouseBox">Mouse:&nbsp;<span id="mouseStatus">Click canvas to lock camera</span></p>
+    </div>
   </div>
 
   <script src="lib/webgl-utils.js"></script>

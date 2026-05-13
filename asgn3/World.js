@@ -635,7 +635,7 @@ function resetGame() {
   let terrain = new TerrainGenerator(BLOCK_GRID_SIZE);
   terrain.generate();
 
-  initTrees(100, 10);
+  initTrees(500, 10);
   initGoldenTree();
 
   SceneObjects();
