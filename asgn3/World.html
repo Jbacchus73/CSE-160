@@ -1,0 +1,50 @@
+<!--
+Justin Bacchus
+jbacchus@ucsc.edu
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>BlockyWorld (1)</title>
+  <style>
+    canvas { float: left; margin-right: 20px; }
+  </style>
+</head>
+
+<body onload="main()">
+  <canvas id="World" width="800" height="800">
+    Please use a browser that supports "canvas"
+  </canvas>
+
+  <p id="numdot">FPS</p>
+
+  <h3>Controls</h3>
+
+  <p>
+  Move Camera: <b>W</b> Forward,
+  <b>S</b> Backward,
+  <b>A</b> Left,
+  <b>D</b> Right
+  </p>
+
+  <p>
+  Elevation: <b>Q</b> Left,
+  <b>E</b> Right
+  </p>
+
+  <p>
+  Look Around: Hold <b>Left Click (Mouse)</b> and drag
+  </p>
+
+
+  <script src="lib/webgl-utils.js"></script>
+  <script src="lib/webgl-debug.js"></script>
+  <script src="lib/cuon-utils.js"></script>
+  <script src="lib/cuon-matrix-cse160.js"></script>
+  <script src="Cube.js"></script>
+  <script src="Triangle.js"></script>
+  <script src="Camera.js"></script>
+  <script src="World.js"></script>
+</body>
+</html>
