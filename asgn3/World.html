@@ -35,27 +35,6 @@ jbacchus@ucsc.edu
       overflow-x: hidden;
     }
 
-    body::before {
-      content: "";
-      position: fixed;
-      left: 55px;
-      top: 82px;
-      width: 120px;
-      height: 32px;
-      background: white;
-      box-shadow:
-        40px -14px 0 white,
-        80px 0 0 white,
-        650px 45px 0 white,
-        690px 30px 0 white,
-        730px 45px 0 white,
-        1080px 80px 0 white,
-        1120px 65px 0 white,
-        1160px 80px 0 white;
-      opacity: 0.8;
-      z-index: -1;
-    }
-
     #topBar {
       width: 100%;
       padding: 16px 0 6px 0;
@@ -74,7 +53,7 @@ jbacchus@ucsc.edu
 
     #topBar p {
       margin: 6px 0 0 0;
-      color: #ffffff;
+      color: white;
       font-size: 15px;
       font-weight: bold;
       text-shadow: 1px 1px 0 #3b2a12;
@@ -159,7 +138,7 @@ jbacchus@ucsc.edu
     #winScreen h1 {
       font-size: 56px;
       margin: 0 0 10px 0;
-      color: #000000;
+      color: #ffd966;
       text-shadow: 3px 3px 0 black;
     }
 
@@ -212,7 +191,7 @@ jbacchus@ucsc.edu
     }
 
     #controls b {
-      color: #ffffff;
+      color: #ffd966;
     }
 
     #numdot {
@@ -239,8 +218,12 @@ jbacchus@ucsc.edu
     }
 
     #gameStatus {
-      color: rgb(255, 255, 255);
+      color: white;
       font-weight: bold;
+    }
+
+    #topBar #gameStatus {
+      color: white !important;
     }
   </style>
 </head>
