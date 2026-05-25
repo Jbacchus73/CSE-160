@@ -93,7 +93,7 @@ var FSHADER_SOURCE = `
     gl_FragColor = vec4(total, 1.0);
   }`
 
-
+let g_lightAnimOn = true;
 let u_spotOn;
 let g_spotOn = true;
 let u_spotPos;
@@ -301,9 +301,11 @@ function addActionsForHtmIUI(){
 
   document.getElementById('animationYellowOffButton').onclick = function() { g_animationOn = false; };
 
-  document.getElementById("lightSlideX").addEventListener("mousemove", function(ev) { if (ev.buttons == 1) { g_lightPos[0] = this.value / 100; } });
-  document.getElementById("lightSlideY").addEventListener("mousemove", function(ev) { if (ev.buttons == 1) { g_lightPos[1] = this.value / 100; renderAllShapes(); } });
-  document.getElementById("lightSlideZ").addEventListener("mousemove", function(ev) { if (ev.buttons == 1) { g_lightPos[2] = this.value / 100; renderAllShapes(); } });
+  document.getElementById("lightSlideX").addEventListener("mousemove", function(ev) { if (ev.buttons == 1) { g_lightAnimOn = false; g_lightPos[0] = this.value / 100; } });
+  document.getElementById("lightSlideY").addEventListener("mousemove", function(ev) { if (ev.buttons == 1) { g_lightAnimOn = false; g_lightPos[1] = this.value / 100; } });
+  document.getElementById("lightSlideZ").addEventListener("mousemove", function(ev) { if (ev.buttons == 1) { g_lightAnimOn = false; g_lightPos[2] = this.value / 100; } });
+  document.getElementById('lightAnimOnButton').onclick = function() { g_lightAnimOn = true; };
+  document.getElementById('lightAnimOffButton').onclick = function() { g_lightAnimOn = false; };
 
   document.getElementById('lightOnButton').onclick = function() { g_lightOn = true; };
   document.getElementById('lightOffButton').onclick = function() { g_lightOn = false; };
@@ -538,6 +540,11 @@ function updateAnimationAngles(){
   else {
     g_headBob = 0;
   }
+  
+  if (g_lightAnimOn) {
+    g_lightPos[0] = 2 * Math.cos(g_seconds);
+    g_lightPos[2] = -2 + 2 * Math.sin(g_seconds);
+  }
 
   let R = 8.0;
   g_sunPos[0] = R * Math.cos(g_seconds * 0.1);
@@ -572,7 +579,7 @@ function renderAllshapes(){
   gl.uniform3f(u_cameraPos, g_cameraX, g_cameraY, g_cameraZ); 
   gl.uniform1i(u_lightOn, g_lightOn);
   gl.uniform3f(u_lightColor, g_lightColor[0], g_lightColor[1], g_lightColor[2]);
-   gl.uniform1i(u_spotOn, g_spotOn);
+  gl.uniform1i(u_spotOn, g_spotOn);
   gl.uniform3f(u_spotPos, g_sunPos[0], g_sunPos[1], g_sunPos[2]);
   gl.uniform3f(u_spotDir, 0 - g_sunPos[0], 0 - g_sunPos[1], 0 - g_sunPos[2]);
 
@@ -589,9 +596,6 @@ function renderAllshapes(){
   for (let i = 0; i < rocks.length; i++) {
   var rock = new Cube();
 
-  let shade = rocks[i].shade;
-  rock.color = [shade, shade, shade * 0.95, 1.0];
-
   rock.matrix.setTranslate(rocks[i].x, -0.21, rocks[i].z);
   rock.matrix.rotate(rocks[i].r, 0, 1, 0);
   rock.matrix.rotate(15, 0, 0, 1);
@@ -603,7 +607,7 @@ function renderAllshapes(){
 
   if (g_tree.loaded) {
     g_tree.matrix.setTranslate(1.5, -0.25, -1.0);
-    g_tree.matrix.scale(0.25, 0.25, 0.25);
+    g_tree.matrix.scale(0.12, 0.12, 0.12);
     g_tree.render();
   }
 

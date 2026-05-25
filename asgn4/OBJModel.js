@@ -4,8 +4,9 @@ class OBJModel {
     this.color = [0.4, 0.55, 0.3, 1.0];
     this.textureNum = -2;
     this.normalMatrix = new Matrix4();
-    this.vertices = []; 
-    this.normals  = []; 
+    this.vertices = [];
+    this.normals  = [];
+    this.mats     = [];      // one material tag per triangle
     this.loaded = false;
   }
 
@@ -13,18 +14,20 @@ class OBJModel {
     let positions = [];
     let norms = [];
     let lines = text.split('\n');
+    let curMat = 'Bark';     // default until first usemtl
 
     for (let line of lines) {
       line = line.trim();
-      if (line.startsWith('v ')) {
+      if (line.startsWith('usemtl ')) {
+        curMat = line.split(/\s+/)[1];        // "Bark" or "Tree"
+      } else if (line.startsWith('v ')) {
         let p = line.split(/\s+/);
         positions.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
       } else if (line.startsWith('vn ')) {
         let p = line.split(/\s+/);
         norms.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
       } else if (line.startsWith('f ')) {
-        let parts = line.split(/\s+/).slice(1);   // the face verts
-        // parse each "v/vt/vn" into {v, n} 0-based
+        let parts = line.split(/\s+/).slice(1);
         let face = parts.map(tok => {
           let idx = tok.split('/');
           return {
@@ -32,10 +35,12 @@ class OBJModel {
             n: idx[2] ? parseInt(idx[2]) - 1 : -1
           };
         });
+        // triangulate fan, tagging each triangle with the current material
         for (let i = 1; i < face.length - 1; i++) {
           this.pushVert(positions, norms, face[0]);
           this.pushVert(positions, norms, face[i]);
           this.pushVert(positions, norms, face[i + 1]);
+          this.mats.push(curMat);
         }
       }
     }
@@ -64,13 +69,14 @@ class OBJModel {
     const TRUNK = [0.40, 0.26, 0.13, 1.0];
     const LEAF  = [0.20, 0.50, 0.20, 1.0];
 
+    let tri = 0;
     for (let i = 0; i < this.vertices.length; i += 9) {
-        let v = this.vertices.slice(i, i + 9);
-        let n = this.normals.slice(i, i + 9);
-        let avgY = (v[1] + v[4] + v[7]) / 3;        // mean Y of the triangle
-        let c = avgY < 10.0 ? TRUNK : LEAF;
-        gl.uniform4f(u_FragColor, c[0], c[1], c[2], c[3]);
-        drawTriangle3DUVNormal(v, [0,0, 0,0, 0,0], n);
-        }
+      let v = this.vertices.slice(i, i + 9);
+      let n = this.normals.slice(i, i + 9);
+      let c = (this.mats[tri] === 'Tree') ? LEAF : TRUNK;
+      gl.uniform4f(u_FragColor, c[0], c[1], c[2], c[3]);
+      drawTriangle3DUVNormal(v, [0,0, 0,0, 0,0], n);
+      tri++;
     }
+  }
 }
