@@ -36,7 +36,6 @@ var FSHADER_SOURCE = `
   uniform vec3 u_lightColor;
   varying vec4 v_VertPos;
   uniform bool u_lightOn;
-  uniform bool u_lightOn;
   uniform bool u_spotOn;
   uniform vec3 u_spotPos;
   uniform vec3 u_spotDir;
@@ -466,6 +465,14 @@ function updateLookDirection() {
   g_lookZ = g_cameraZ + dirZ;
 }
 
+let g_tree = new OBJModel();
+
+function loadTree() {
+  fetch('Lowpoly_tree_sample.obj')
+    .then(r => r.text())
+    .then(text => { g_tree.parse(text); });
+}
+
 
 function main() {
 
@@ -475,6 +482,7 @@ function main() {
   connectVariablesToGLSL();
   addActionsForHtmIUI();
   updateLookDirection();
+  loadTree(); 
 
   // Specify the color for clearing <canvas>
   gl.clearColor(0.53, 0.81, 0.92, 1.0);
@@ -531,9 +539,9 @@ function updateAnimationAngles(){
     g_headBob = 0;
   }
 
-  let R = 5.0;
-  g_sunPos[0] = R * Math.cos(g_seconds * 0.5);
-  g_sunPos[1] = R * Math.sin(g_seconds * 0.5);
+  let R = 8.0;
+  g_sunPos[0] = R * Math.cos(g_seconds * 0.1);
+  g_sunPos[1] = R * Math.sin(g_seconds * 0.1);
   g_sunPos[2] = 0;
 }
 
@@ -592,6 +600,12 @@ function renderAllshapes(){
   rock.render();
   }
  }
+
+  if (g_tree.loaded) {
+    g_tree.matrix.setTranslate(1.5, -0.25, -1.0);
+    g_tree.matrix.scale(0.25, 0.25, 0.25);
+    g_tree.render();
+  }
 
   var light = new Cube();
   light.color = [2, 2, 0, 1];
