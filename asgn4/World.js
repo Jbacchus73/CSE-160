@@ -33,45 +33,75 @@ var FSHADER_SOURCE = `
   uniform int u_whichTexture;
   uniform vec3 u_lightPos; 
   uniform vec3 u_cameraPos;
+  uniform vec3 u_lightColor;
   varying vec4 v_VertPos;
   uniform bool u_lightOn;
+  uniform bool u_lightOn;
+  uniform bool u_spotOn;
+  uniform vec3 u_spotPos;
+  uniform vec3 u_spotDir;
 
   void main() {
 
-    if (u_whichTexture == -3) {
-      gl_FragColor = vec4((v_Normal + 1.0) / 2.0, 1.0);    // Use normal debug color
-
+    if (u_whichTexture == -4) {
+      gl_FragColor = u_FragColor;            // emissive (sun) - no shading
+      return;
+    } else if (u_whichTexture == -3) {
+      gl_FragColor = vec4((v_Normal + 1.0) / 2.0, 1.0);
+      return;
     } else if (u_whichTexture == -2) {
-      gl_FragColor = u_FragColor;                           // Use color
-
+      gl_FragColor = u_FragColor;
     } else if (u_whichTexture == -1) {
-      gl_FragColor = vec4(v_UV, 1.0, 1.0);                  // Use UV debug color
-
+      gl_FragColor = vec4(v_UV, 1.0, 1.0);
     } else if (u_whichTexture == 0) {
-      gl_FragColor = texture2D(u_Sampler0, v_UV);            // Use texture0
-
+      gl_FragColor = texture2D(u_Sampler0, v_UV);
     } else if (u_whichTexture == 1) {
-      gl_FragColor = texture2D(u_Sampler1, v_UV);            // Use texture1
-
+      gl_FragColor = texture2D(u_Sampler1, v_UV);
     } else {
-      gl_FragColor = vec4(1.0, 0.2, 0.2, 1.0);              // Error, put reddish
+      gl_FragColor = vec4(1.0, 0.2, 0.2, 1.0);
     }
-    
-    vec3 lightVector = u_lightPos-vec3(v_VertPos);
-    float r = length(lightVector);
-    vec3 L = normalize (lightVector);
+
+    vec3 baseColor = vec3(gl_FragColor);
     vec3 N = normalize(v_Normal);
-    float nDotL = max(dot(N,L), 0.0);
-    vec3 R = reflect(-L,N); 
-    vec3 E = normalize(u_cameraPos-vec3(v_VertPos));
-    float specular = pow(max(dot(E,R), 0.0), 10.0);
-    vec3 diffuse = vec3(gl_FragColor) * nDotL * 0.7;
-    vec3 ambient = vec3(gl_FragColor) * 0.3;
+    vec3 E = normalize(u_cameraPos - vec3(v_VertPos));
+
+    vec3 ambient = baseColor * 0.3;
+    vec3 total = ambient;
+
+    // --- Point light ---
     if (u_lightOn) {
-      gl_FragColor = vec4(specular + diffuse + ambient, 1.0);
+      vec3 L = normalize(u_lightPos - vec3(v_VertPos));
+      float nDotL = max(dot(N, L), 0.0);
+      vec3 R = reflect(-L, N);
+      float spec = pow(max(dot(E, R), 0.0), 10.0);
+      total += baseColor * nDotL * 0.7 * u_lightColor + spec * u_lightColor;
     }
+
+    // --- Spotlight (sun) ---
+    if (u_spotOn) {
+      vec3 L = normalize(u_spotPos - vec3(v_VertPos));
+      vec3 D = normalize(u_spotDir);
+      float spotCos = dot(-L, D);
+      if (spotCos > 0.85) {                 // inside the cone
+        float nDotL = max(dot(N, L), 0.0);
+        vec3 R = reflect(-L, N);
+        float spec = pow(max(dot(E, R), 0.0), 20.0);
+        vec3 sun = vec3(1.0, 0.85, 0.5);    // warm sun tint
+        total += (baseColor * nDotL * 0.7 + spec) * sun;
+      }
+    }
+
+    gl_FragColor = vec4(total, 1.0);
   }`
 
+
+let u_spotOn;
+let g_spotOn = true;
+let u_spotPos;
+let u_spotDir;
+let g_sunPos = [0, 5, 0];
+let u_lightColor;
+let g_lightColor = [1.0, 1.0, 1.0];
 let u_NormalMatrix;
 let u_cameraPos;
 let canvas; 
@@ -125,9 +155,20 @@ function connectVariablesToGLSL(){
     console.log('Failed to intialize shaders.');
     return;
   }
+
+  u_spotOn  = gl.getUniformLocation(gl.program, 'u_spotOn');
+  u_spotPos = gl.getUniformLocation(gl.program, 'u_spotPos');
+  u_spotDir = gl.getUniformLocation(gl.program, 'u_spotDir');
   u_lightOn = gl.getUniformLocation(gl.program, 'u_lightOn');
+
   if (!u_lightOn) {
     console.log('Failed to get the storage location of u_lightOn');
+    return;
+  }
+
+  u_lightColor = gl.getUniformLocation(gl.program, 'u_lightColor');
+  if (!u_lightColor) {
+    console.log('Failed to get the storage location of u_lightColor');
     return;
   }
 
@@ -267,6 +308,16 @@ function addActionsForHtmIUI(){
 
   document.getElementById('lightOnButton').onclick = function() { g_lightOn = true; };
   document.getElementById('lightOffButton').onclick = function() { g_lightOn = false; };
+
+  document.getElementById('lightColorPicker').addEventListener('input', function() {
+    let hex = this.value;                       // e.g. "#ff8800"
+    g_lightColor[0] = parseInt(hex.substr(1,2), 16) / 255;
+    g_lightColor[1] = parseInt(hex.substr(3,2), 16) / 255;
+    g_lightColor[2] = parseInt(hex.substr(5,2), 16) / 255;
+  });
+
+  document.getElementById('spotOnButton').onclick  = function() { g_spotOn = true; };
+  document.getElementById('spotOffButton').onclick = function() { g_spotOn = false; };
 
 
   // Camera Controls 
@@ -480,7 +531,10 @@ function updateAnimationAngles(){
     g_headBob = 0;
   }
 
-  g_lightPos[0] = Math.cos(g_seconds);
+  let R = 5.0;
+  g_sunPos[0] = R * Math.cos(g_seconds * 0.5);
+  g_sunPos[1] = R * Math.sin(g_seconds * 0.5);
+  g_sunPos[2] = 0;
 }
 
 let rocks = [];
@@ -509,6 +563,11 @@ function renderAllshapes(){
   gl.uniform3f(u_lightPos, g_lightPos[0], g_lightPos[1], g_lightPos[2]);
   gl.uniform3f(u_cameraPos, g_cameraX, g_cameraY, g_cameraZ); 
   gl.uniform1i(u_lightOn, g_lightOn);
+  gl.uniform3f(u_lightColor, g_lightColor[0], g_lightColor[1], g_lightColor[2]);
+   gl.uniform1i(u_spotOn, g_spotOn);
+  gl.uniform3f(u_spotPos, g_sunPos[0], g_sunPos[1], g_sunPos[2]);
+  gl.uniform3f(u_spotDir, 0 - g_sunPos[0], 0 - g_sunPos[1], 0 - g_sunPos[2]);
+
 
 
  if (g_showEnvironment) {
@@ -541,19 +600,18 @@ function renderAllshapes(){
   light.matrix.translate(-.5, -.5, -.5);
   light.render();
 
+  var sun = new Sphere();
+  sun.color = [1.0, 0.9, 0.4, 1.0];
+  sun.textureNum = -4;               
+  sun.matrix.setTranslate(g_sunPos[0], g_sunPos[1], g_sunPos[2]);
+  sun.matrix.scale(0.5, 0.5, 0.5);
+  sun.render();
+
   var ball = new Sphere();
   ball.color = [0.8, 0.3, 0.3, 1.0];
   ball.matrix.setTranslate(1.2, 0.3, 0);
   ball.matrix.scale(0.4, 0.4, 0.4);
   ball.render();
-
-  var sky = new Cube();
-  sky.color = [0.5, 0.7, 1.0, 1.0];
-  sky.textureNum = -3;              // -3 = normal visualization
-  sky.matrix.setTranslate(0, 0, 0);
-  sky.matrix.scale(12, 12, 12);
-  sky.matrix.translate(-0.5, -0.5, -0.5);   // center it on origin
-  sky.render();
 
   const FUR = [0.55, 0.42, 0.30, 1.0];
   var body = new Cube();
