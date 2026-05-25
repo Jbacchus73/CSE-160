@@ -93,6 +93,7 @@ var FSHADER_SOURCE = `
     gl_FragColor = vec4(total, 1.0);
   }`
 
+let g_treePositions = [];
 let g_lightAnimOn = true;
 let u_spotOn;
 let g_spotOn = true;
@@ -138,7 +139,7 @@ function setupWebGL(){
   canvas = document.getElementById('BlockyAnimal');
 
   // Get the rendering context for WebGL
-  gl = canvas.getContext("webgl", {preserveDrawingBuffer: true});
+  gl = canvas.getContext("webgl");
   if (!gl) {
     console.log('Failed to get the rendering context for WebGL');
     return;
@@ -475,6 +476,28 @@ function loadTree() {
     .then(text => { g_tree.parse(text); });
 }
 
+function generateTreePositions(count) {
+  g_treePositions = [];
+
+  for (let i = 0; i < count; i++) {
+    let x = -4.5 + Math.random() * 9.0;
+    let z = -4.5 + Math.random() * 9.0;
+
+    if (Math.abs(x) < 1.2 && Math.abs(z) < 1.2) {
+      i--;
+      continue;
+    }
+
+    g_treePositions.push({
+      x: x,
+      y: -0.25,
+      z: z,
+      scale: 0.08 + Math.random() * 0.06,
+      rot: Math.random() * 360
+    });
+  }
+}
+
 
 function main() {
 
@@ -482,8 +505,10 @@ function main() {
   setupWebGL(); 
   // setup glsl programs and connect glsl variables 
   connectVariablesToGLSL();
+  initCubeBuffers();
   addActionsForHtmIUI();
   updateLookDirection();
+  generateTreePositions(4);
   loadTree(); 
 
   // Specify the color for clearing <canvas>
@@ -575,6 +600,7 @@ function renderAllshapes(){
   gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
   gl.uniform3f(u_lightPos, g_lightPos[0], g_lightPos[1], g_lightPos[2]);
   gl.uniform3f(u_cameraPos, g_cameraX, g_cameraY, g_cameraZ); 
   gl.uniform1i(u_lightOn, g_lightOn);
@@ -583,34 +609,64 @@ function renderAllshapes(){
   gl.uniform3f(u_spotPos, g_sunPos[0], g_sunPos[1], g_sunPos[2]);
   gl.uniform3f(u_spotDir, 0 - g_sunPos[0], 0 - g_sunPos[1], 0 - g_sunPos[2]);
 
+  function drawPart(color, tx, ty, tz, sx, sy, sz, rotations) {
+    var c = new Cube();
+    c.color = color;
+    c.matrix.setTranslate(tx, ty, tz);
 
+    if (rotations) {
+      for (let i = 0; i < rotations.length; i++) {
+        c.matrix.rotate(rotations[i][0], rotations[i][1], rotations[i][2], rotations[i][3]);
+      }
+    }
 
- if (g_showEnvironment) {
-  var ground = new Cube();
-  ground.color = [0.18, 0.42, 0.12, 1.0];
-  ground.matrix.setTranslate(0, -0.27, 0);
-  ground.matrix.scale(10.0, 0.08, 10.0);
-  ground.matrix.translate(-0.5, -0.5, -0.5);
-  ground.render();
-
-  for (let i = 0; i < rocks.length; i++) {
-  var rock = new Cube();
-
-  rock.matrix.setTranslate(rocks[i].x, -0.21, rocks[i].z);
-  rock.matrix.rotate(rocks[i].r, 0, 1, 0);
-  rock.matrix.rotate(15, 0, 0, 1);
-  rock.matrix.scale(rocks[i].sx, rocks[i].sy, rocks[i].sz);
-  rock.matrix.translate(-0.5, -0.5, -0.5);
-  rock.render();
+    c.matrix.scale(sx, sy, sz);
+    c.matrix.translate(-0.5, -0.5, -0.5);
+    c.render();
+    return c;
   }
- }
 
-  if (g_tree.loaded) {
-    g_tree.matrix.setTranslate(1.5, -0.25, -1.0);
-    g_tree.matrix.scale(0.12, 0.12, 0.12);
+  function drawFromMatrix(color, matrix, sx, sy, sz, tx, ty, tz) {
+    var c = new Cube();
+    c.color = color;
+    c.matrix = new Matrix4(matrix);
+    c.matrix.scale(sx, sy, sz);
+    c.matrix.translate(tx, ty, tz);
+    c.render();
+    return c;
+  }
+
+  if (g_showEnvironment) {
+    var ground = new Cube();
+    ground.color = [0.18, 0.42, 0.12, 1.0];
+    ground.matrix.setTranslate(0, -0.27, 0);
+    ground.matrix.scale(10.0, 0.08, 10.0);
+    ground.matrix.translate(-0.5, -0.5, -0.5);
+    ground.render();
+
+    for (let i = 0; i < rocks.length; i++) {
+      var rock = new Cube();
+      let shade = rocks[i].shade;
+      rock.color = [shade, shade, shade * 0.95, 1.0];
+      rock.matrix.setTranslate(rocks[i].x, -0.21, rocks[i].z);
+      rock.matrix.rotate(rocks[i].r, 0, 1, 0);
+      rock.matrix.rotate(15, 0, 0, 1);
+      rock.matrix.scale(rocks[i].sx, rocks[i].sy, rocks[i].sz);
+      rock.matrix.translate(-0.5, -0.5, -0.5);
+      rock.render();
+    }
+  }
+
+  if (g_tree.loaded && g_showEnvironment) {
+  for (let i = 0; i < g_treePositions.length; i++) {
+    let t = g_treePositions[i];
+
+    g_tree.matrix.setTranslate(t.x, t.y, t.z);
+    g_tree.matrix.rotate(t.rot, 0, 1, 0);
+    g_tree.matrix.scale(t.scale, t.scale, t.scale);
     g_tree.render();
   }
-
+}
   var light = new Cube();
   light.color = [2, 2, 0, 1];
   light.matrix.translate(g_lightPos[0], g_lightPos[1], g_lightPos[2]);
@@ -632,297 +688,64 @@ function renderAllshapes(){
   ball.render();
 
   const FUR = [0.55, 0.42, 0.30, 1.0];
-  var body = new Cube();
-  body.color = FUR;
-  body.matrix.setTranslate(0, 0, 0);
-  body.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  body.matrix.scale(0.4, 0.35, 0.6);
-  body.matrix.translate(-0.5, -0.5, -0.5);
-  body.render();
+  const BELLY = [0.72, 0.64, 0.55, 1.0];
+  const FACE = [0.85, 0.73, 0.58, 1.0];
+  const CHIN = [0.78, 0.66, 0.52, 1.0];
+  const DARK = [0.18, 0.12, 0.08, 1.0];
+  const BLACK = [0.03, 0.02, 0.015, 1.0];
+  const WHITE = [1.0, 1.0, 1.0, 1.0];
+  const SNOUT = [0.30, 0.22, 0.16, 1.0];
+  const MOUTH = [0.05, 0.03, 0.02, 1.0];
+  const NOSTRIL = [0.04, 0.025, 0.015, 1.0];
+  const CLAW = [0.95, 0.92, 0.85, 1.0];
 
-  var bodyTop = new Cube();
-  bodyTop.color = FUR;
-  bodyTop.matrix.setTranslate(0, 0.18, 0);
-  bodyTop.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  bodyTop.matrix.scale(0.34, 0.04, 0.54);
-  bodyTop.matrix.translate(-0.5, -0.5, -0.5);
-  bodyTop.render();
+  let bodyRot = g_pokeBodyAngle + g_headBob;
+  let headRot = g_pokeHeadAngle + g_headBob;
 
-  var bodyCrown = new Cube();
-  bodyCrown.color = FUR;
-  bodyCrown.matrix.setTranslate(0, 0.21, 0);
-  bodyCrown.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  bodyCrown.matrix.scale(0.28, 0.03, 0.48);
-  bodyCrown.matrix.translate(-0.5, -0.5, -0.5);
-  bodyCrown.render();
+  drawPart(FUR, 0, 0, 0, 0.4, 0.35, 0.6, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0, 0.18, 0, 0.34, 0.04, 0.54, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0, 0.21, 0, 0.28, 0.03, 0.48, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0, -0.18, 0, 0.34, 0.04, 0.54, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0, -0.21, 0, 0.28, 0.03, 0.48, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, -0.2, 0, 0, 0.04, 0.3, 0.54, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0.2, 0, 0, 0.04, 0.3, 0.54, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0, 0, 0.29, 0.34, 0.3, 0.04, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0, 0, -0.29, 0.34, 0.3, 0.04, [[bodyRot, 0, 0, 1]]);
 
-  var bodyBottom = new Cube();
-  bodyBottom.color = FUR;
-  bodyBottom.matrix.setTranslate(0, -0.18, 0);
-  bodyBottom.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  bodyBottom.matrix.scale(0.34, 0.04, 0.54);
-  bodyBottom.matrix.translate(-0.5, -0.5, -0.5);
-  bodyBottom.render();
+  drawPart(FUR, 0, -0.03, 0.28, 0.28, 0.28, 0.2, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0, -0.01, -0.3, 0.13, 0.1, 0.2, [[-30, 1, 0, 0], [g_pokeBodyAngle, 0, 0, 1]]);
+  drawPart(BELLY, 0, -0.21, 0, 0.32, 0.04, 0.5, [[bodyRot, 0, 0, 1]]);
 
-  var bodyKeel = new Cube();
-  bodyKeel.color = FUR;
-  bodyKeel.matrix.setTranslate(0, -0.21, 0);
-  bodyKeel.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  bodyKeel.matrix.scale(0.28, 0.03, 0.48);
-  bodyKeel.matrix.translate(-0.5, -0.5, -0.5);
-  bodyKeel.render();
+  drawPart(FUR, -0.16, 0.08, 0.15, .14, .14, .14, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0.16, 0.08, 0.15, .14, .14, .14, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, -0.16, 0.08, -0.15, .14, .14, .14, [[bodyRot, 0, 0, 1]]);
+  drawPart(FUR, 0.16, 0.08, -0.15, .14, .14, .14, [[bodyRot, 0, 0, 1]]);
 
-  var bodyLeft = new Cube();
-  bodyLeft.color = FUR;
-  bodyLeft.matrix.setTranslate(-0.2, 0, 0);
-  bodyLeft.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  bodyLeft.matrix.scale(0.04, 0.3, 0.54);
-  bodyLeft.matrix.translate(-0.5, -0.5, -0.5);
-  bodyLeft.render();
+  drawPart(FUR, 0, -0.02, 0.5, 0.42, 0.38, 0.3, [[headRot, 1, 0, 0]]);
+  drawPart(FUR, 0, 0.18, 0.5, 0.36, 0.04, 0.26, [[headRot, 1, 0, 0]]);
+  drawPart(FUR, 0, 0.21, 0.5, 0.28, 0.03, 0.2, [[headRot, 1, 0, 0]]);
+  drawPart(FUR, 0, -0.22, 0.5, 0.36, 0.04, 0.26, [[headRot, 1, 0, 0]]);
+  drawPart(FUR, 0, -0.25, 0.5, 0.28, 0.03, 0.2, [[headRot, 1, 0, 0]]);
+  drawPart(FUR, -0.21, -0.02, 0.5, 0.04, 0.32, 0.26, [[headRot, 1, 0, 0]]);
+  drawPart(FUR, 0.21, -0.02, 0.5, 0.04, 0.32, 0.26, [[headRot, 1, 0, 0]]);
 
-  var bodyRight = new Cube();
-  bodyRight.color = FUR;
-  bodyRight.matrix.setTranslate(0.2, 0, 0);
-  bodyRight.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  bodyRight.matrix.scale(0.04, 0.3, 0.54);
-  bodyRight.matrix.translate(-0.5, -0.5, -0.5);
-  bodyRight.render();
+  drawPart(FACE, 0, -0.02, 0.651, 0.38, 0.32, 0.01, [[headRot, 1, 0, 0]]);
+  drawPart(DARK, 0, 0.045, 0.66, 0.34, 0.085, 0.012, [[headRot, 1, 0, 0]]);
+  drawPart(CHIN, 0, -0.148, 0.665, 0.22, 0.08, 0.012, [[headRot, 1, 0, 0]]);
 
-  var bodyFront = new Cube();
-  bodyFront.color = FUR;
-  bodyFront.matrix.setTranslate(0, 0, 0.29);
-  bodyFront.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  bodyFront.matrix.scale(0.34, 0.3, 0.04);
-  bodyFront.matrix.translate(-0.5, -0.5, -0.5);
-  bodyFront.render();
+  drawPart(DARK, -0.105, -0.05, 0.665, 0.055, 0.25, 0.012, [[-22, 0, 0, 1], [headRot, 1, 0, 0]]);
+  drawPart(DARK, 0.105, -0.05, 0.665, 0.055, 0.25, 0.012, [[22, 0, 0, 1], [headRot, 1, 0, 0]]);
 
-  var bodyBack = new Cube();
-  bodyBack.color = FUR;
-  bodyBack.matrix.setTranslate(0, 0, -0.29);
-  bodyBack.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  bodyBack.matrix.scale(0.34, 0.3, 0.04);
-  bodyBack.matrix.translate(-0.5, -0.5, -0.5);
-  bodyBack.render();
+  drawPart(BLACK, -0.085, 0.045, 0.674, 0.055, 0.055, 0.01, [[headRot, 1, 0, 0]]);
+  drawPart(BLACK, 0.085, 0.045, 0.674, 0.055, 0.055, 0.01, [[headRot, 1, 0, 0]]);
 
-  var neck = new Cube(); 
-  neck.color = FUR; 
-  neck.matrix.setTranslate(0, -0.03, 0.28); 
-  neck.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  neck.matrix.scale(0.28, 0.28, 0.2); 
-  neck.matrix.translate(-0.5,-0.5,-0.5);
-  neck.render(); 
+  drawPart(WHITE, -0.073, 0.057, 0.681, 0.014, 0.016, 0.006, [[headRot, 1, 0, 0]]);
+  drawPart(WHITE, 0.097, 0.057, 0.681, 0.014, 0.016, 0.006, [[headRot, 1, 0, 0]]);
 
-  var tail = new Cube(); 
-  tail.color = FUR; 
-  tail.matrix.setTranslate(0, -0.01, -0.3); 
-  tail.matrix.rotate(-30,1,0,0); 
-  tail.matrix.rotate(g_pokeBodyAngle, 0, 0, 1);
-  tail.matrix.scale(0.13, 0.1, 0.2); 
-  tail.matrix.translate(-0.5,-0.5,-0.5);
-  tail.render(); 
-
-  var belly = new Cube(); 
-  belly.color = [0.72, 0.64, 0.55, 1.0];
-  belly.matrix.setTranslate(0, -0.21, 0);
-  belly.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  belly.matrix.scale(0.32, 0.04, 0.5);
-  belly.matrix.translate(-0.5,-0.5,-0.5);
-  belly.render(); 
-    
-  var flShoulder = new Cube(); 
-  flShoulder.color = FUR; 
-  flShoulder.matrix.setTranslate(-0.16, 0.08, 0.15);
-  flShoulder.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  flShoulder.matrix.scale(.14,.14,.14); 
-  flShoulder.matrix.translate(-0.5,-0.5,-0.5);
-  flShoulder.render(); 
-
-  var frShoulder = new Cube(); 
-  frShoulder.color = FUR; 
-  frShoulder.matrix.setTranslate(0.16, 0.08, 0.15);
-  frShoulder.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  frShoulder.matrix.scale(.14,.14,.14); 
-  frShoulder.matrix.translate(-0.5,-0.5,-0.5);
-  frShoulder.render();
-
-  var blHip = new Cube(); 
-  blHip.color = FUR; 
-  blHip.matrix.setTranslate(-0.16, 0.08, -0.15);
-  blHip.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  blHip.matrix.scale(.14,.14,.14); 
-  blHip.matrix.translate(-0.5,-0.5,-0.5);
-  blHip.render();
-
-  var brHip = new Cube(); 
-  brHip.color = FUR; 
-  brHip.matrix.setTranslate(0.16, 0.08, -0.15);
-  brHip.matrix.rotate(g_pokeBodyAngle + g_headBob, 0, 0, 1);
-  brHip.matrix.scale(.14,.14,.14); 
-  brHip.matrix.translate(-0.5,-0.5,-0.5);
-  brHip.render();
-
-  var head = new Cube(); 
-  head.color = FUR; 
-  head.matrix.setTranslate(0, -0.02, 0.5);
-  head.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  head.matrix.scale(0.42, 0.38, 0.3);
-  head.matrix.translate(-0.5, -0.5, -0.5);
-  head.render();
-
-  var headTop = new Cube(); 
-  headTop.color = FUR; 
-  headTop.matrix.setTranslate(0, 0.18, 0.5);
-  headTop.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  headTop.matrix.scale(0.36, 0.04, 0.26);
-  headTop.matrix.translate(-0.5, -0.5, -0.5);
-  headTop.render();
-
-  var headCrown = new Cube();
-  headCrown.color = FUR;
-  headCrown.matrix.setTranslate(0, 0.21, 0.5);
-  headCrown.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  headCrown.matrix.scale(0.28, 0.03, 0.2);
-  headCrown.matrix.translate(-0.5, -0.5, -0.5);
-  headCrown.render();
-
-  var headBottom = new Cube();
-  headBottom.color = FUR;
-  headBottom.matrix.setTranslate(0, -0.22, 0.5);
-  headBottom.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  headBottom.matrix.scale(0.36, 0.04, 0.26);
-  headBottom.matrix.translate(-0.5, -0.5, -0.5);
-  headBottom.render();
-
-  var headChin = new Cube();
-  headChin.color = FUR;
-  headChin.matrix.setTranslate(0, -0.25, 0.5);
-  headChin.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  headChin.matrix.scale(0.28, 0.03, 0.2);
-  headChin.matrix.translate(-0.5, -0.5, -0.5);
-  headChin.render();
-
-  var headLeft = new Cube();
-  headLeft.color = FUR;
-  headLeft.matrix.setTranslate(-0.21, -0.02, 0.5);
-  headLeft.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  headLeft.matrix.scale(0.04, 0.32, 0.26);
-  headLeft.matrix.translate(-0.5, -0.5, -0.5);
-  headLeft.render();
-
-  var headRight = new Cube();
-  headRight.color = FUR;
-  headRight.matrix.setTranslate(0.21, -0.02, 0.5);
-  headRight.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  headRight.matrix.scale(0.04, 0.32, 0.26);
-  headRight.matrix.translate(-0.5, -0.5, -0.5);
-  headRight.render();
-
-  var face = new Cube();
-  face.color = [0.85, 0.73, 0.58, 1.0];
-  face.matrix.setTranslate(0, -0.02, 0.651);
-  face.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  face.matrix.scale(0.38, 0.32, 0.01);  
-  face.matrix.translate(-0.5, -0.5, -0.5);
-  face.render();
-
-  var eyeBand = new Cube(); 
-  eyeBand.color = [0.18, 0.12, 0.08, 1.0];
-  eyeBand.matrix.setTranslate(0, 0.045, 0.66);
-  eyeBand.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  eyeBand.matrix.scale(0.34, 0.085, 0.012);
-  eyeBand.matrix.translate(-0.5, -0.5, -0.5);
-  eyeBand.render();
-
-  var chinPatch = new Cube();
-  chinPatch.color = [0.78, 0.66, 0.52, 1.0];
-  chinPatch.matrix.setTranslate(0, -0.148, 0.665);
-  chinPatch.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  chinPatch.matrix.scale(0.22, 0.08, 0.012);
-  chinPatch.matrix.translate(-0.5, -0.5, -0.5);
-  chinPatch.render();
-
-  var lStreak = new Cube(); 
-  lStreak.color = [0.18, 0.12, 0.08, 1.0];
-  lStreak.matrix.setTranslate(-0.105, -0.05, 0.665);
-  lStreak.matrix.rotate(-22, 0, 0, 1);
-  lStreak.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  lStreak.matrix.scale(0.055, 0.25, 0.012);
-  lStreak.matrix.translate(-0.5, -0.5, -0.5);
-  lStreak.render();
-
-  var rStreak = new Cube();
-  rStreak.color = [0.18, 0.12, 0.08, 1.0];
-  rStreak.matrix.setTranslate(0.105, -0.05, 0.665);
-  rStreak.matrix.rotate(22, 0, 0, 1);
-  rStreak.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  rStreak.matrix.scale(0.055, 0.25, 0.012);
-  rStreak.matrix.translate(-0.5, -0.5, -0.5);
-  rStreak.render();
-
-  var lEye = new Cube();
-  lEye.color = [0.03, 0.02, 0.015, 1.0];
-  lEye.matrix.setTranslate(-0.085, 0.045, 0.674);
-  lEye.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  lEye.matrix.scale(0.055, 0.055, 0.01);
-  lEye.matrix.translate(-0.5, -0.5, -0.5);
-  lEye.render();
-
-  var rEye = new Cube();
-  rEye.color = [0.03, 0.02, 0.015, 1.0];
-  rEye.matrix.setTranslate(0.085, 0.045, 0.674);
-  rEye.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  rEye.matrix.scale(0.055, 0.055, 0.01);
-  rEye.matrix.translate(-0.5, -0.5, -0.5);
-  rEye.render();
-
-  var lShine = new Cube(); 
-  lShine.color = [1.0, 1.0, 1.0, 1.0];
-  lShine.matrix.setTranslate(-0.073, 0.057, 0.681);
-  lShine.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  lShine.matrix.scale(0.014, 0.016, 0.006);
-  lShine.matrix.translate(-0.5, -0.5, -0.5);
-  lShine.render();
-
-  var rShine = new Cube();
-  rShine.color = [1.0, 1.0, 1.0, 1.0];
-  rShine.matrix.setTranslate(0.097, 0.057, 0.681);
-  rShine.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  rShine.matrix.scale(0.014, 0.016, 0.006);
-  rShine.matrix.translate(-0.5, -0.5, -0.5);
-  rShine.render();
-
-  var snout = new Cube();
-  snout.color = [0.30, 0.22, 0.16, 1.0];
-  snout.matrix.setTranslate(0, -0.08, 0.69);
-  snout.matrix.rotate(12, 1, 0, 0);
-  snout.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  snout.matrix.scale(0.17, 0.11, 0.08);
-  snout.matrix.translate(-0.5, -0.5, -0.5);
-  snout.render();
-
-  var mouth = new Cube(); 
-  mouth.color = [0.05, 0.03, 0.02, 1.0];
-  mouth.matrix.setTranslate(0, -0.105, 0.735);
-  mouth.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  mouth.matrix.scale(0.13, 0.035, 0.01);
-  mouth.matrix.translate(-0.5, -0.5, -0.5);
-  mouth.render();
-
-  var lNostril = new Cube();
-  lNostril.color = [0.04, 0.025, 0.015, 1.0];
-  lNostril.matrix.setTranslate(-0.03, -0.04, 0.738);
-  lNostril.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  lNostril.matrix.scale(0.025, 0.04, 0.008);
-  lNostril.matrix.translate(-0.5, -0.5, -0.5);
-  lNostril.render();
-
-  var rNostril = new Cube();
-  rNostril.color = [0.04, 0.025, 0.015, 1.0];
-  rNostril.matrix.setTranslate(0.03, -0.04, 0.738);
-  rNostril.matrix.rotate(g_pokeHeadAngle + g_headBob, 1, 0, 0);
-  rNostril.matrix.scale(0.025, 0.04, 0.008);
-  rNostril.matrix.translate(-0.5, -0.5, -0.5);
-  rNostril.render();
+  drawPart(SNOUT, 0, -0.08, 0.69, 0.17, 0.11, 0.08, [[12, 1, 0, 0], [headRot, 1, 0, 0]]);
+  drawPart(MOUTH, 0, -0.105, 0.735, 0.13, 0.035, 0.01, [[headRot, 1, 0, 0]]);
+  drawPart(NOSTRIL, -0.03, -0.04, 0.738, 0.025, 0.04, 0.008, [[headRot, 1, 0, 0]]);
+  drawPart(NOSTRIL, 0.03, -0.04, 0.738, 0.025, 0.04, 0.008, [[headRot, 1, 0, 0]]);
 
   var flUpper = new Cube();
   flUpper.color = FUR;
@@ -936,7 +759,7 @@ function renderAllshapes(){
 
   var flFore = new Cube();
   flFore.color = FUR;
-  flFore.matrix = flElbowMat;
+  flFore.matrix = new Matrix4(flElbowMat);
   flFore.matrix.translate(-0.03, -0.25, 0);
   flFore.matrix.rotate(-75 + g_flElbowAngle + g_pokeArmAngle * 0.4, 1, 0, 0);
   flFore.matrix.translate(0.03, 0, 0);
@@ -947,7 +770,7 @@ function renderAllshapes(){
 
   var flHand = new Cube();
   flHand.color = FUR;
-  flHand.matrix = flWristMat;
+  flHand.matrix = new Matrix4(flWristMat);
   flHand.matrix.translate(0, -0.35, 0);
   flHand.matrix.rotate(g_flHandAngle, 1, 0, 0);
   var flHandMat = new Matrix4(flHand.matrix);
@@ -967,7 +790,7 @@ function renderAllshapes(){
 
   var frFore = new Cube();
   frFore.color = FUR;
-  frFore.matrix = frElbowMat;
+  frFore.matrix = new Matrix4(frElbowMat);
   frFore.matrix.translate(0.03, -0.25, 0);
   frFore.matrix.rotate(-75 + g_frElbowAngle + g_pokeArmAngle * 0.4, 1, 0, 0);
   frFore.matrix.translate(-0.03, 0, 0);
@@ -978,7 +801,7 @@ function renderAllshapes(){
 
   var frHand = new Cube();
   frHand.color = FUR;
-  frHand.matrix = frWristMat;
+  frHand.matrix = new Matrix4(frWristMat);
   frHand.matrix.translate(0, -0.35, 0);
   frHand.matrix.rotate(g_frHandAngle, 1, 0, 0);
   var frHandMat = new Matrix4(frHand.matrix);
@@ -998,7 +821,7 @@ function renderAllshapes(){
 
   var blShin = new Cube();
   blShin.color = FUR;
-  blShin.matrix = blKneeMat;
+  blShin.matrix = new Matrix4(blKneeMat);
   blShin.matrix.translate(0.03, -0.25, 0);
   blShin.matrix.rotate(-80 + g_blKneeAngle, 1, 0, 0);
   blShin.matrix.translate(-0.03, 0, 0);
@@ -1019,7 +842,7 @@ function renderAllshapes(){
 
   var brShin = new Cube();
   brShin.color = FUR;
-  brShin.matrix = brKneeMat;
+  brShin.matrix = new Matrix4(brKneeMat);
   brShin.matrix.translate(0.03, -0.25, 0);
   brShin.matrix.rotate(-80 + g_brKneeAngle, 1, 0, 0);
   brShin.matrix.translate(-0.03, 0, 0);
@@ -1027,8 +850,6 @@ function renderAllshapes(){
   brShin.matrix.scale(0.1, 0.15, 0.07);
   brShin.matrix.translate(-0.5, -1.25, -1.35);
   brShin.render();
-
-  const CLAW = [0.95, 0.92, 0.85, 1.0];
 
   function drawClaws(parentMat, armLength, zOffset, xShift){
     for (let i = 0; i < 3; i++) {
@@ -1042,13 +863,14 @@ function renderAllshapes(){
       claw.render();
     }
   }
+
   drawClaws(flHandMat, 0.08, 0.02, 0);
   drawClaws(frHandMat, 0.08, 0.02, 0);
   drawClaws(blAnkleMat, 0.18, -0.06, 0.02); 
   drawClaws(brAnkleMat, 0.18, -0.06, -0.02);
 
   var duration = performance.now() - startTime;
-  sendTextToHTML("ms: " + Math.floor(duration) + " fps: " + Math.floor(1000/duration), "numdot");
+  sendTextToHTML("ms: " + Math.floor(duration) + " fps: " + Math.floor(1000 / duration), "numdot");
 }
 
 // Set the text of a HTML element
