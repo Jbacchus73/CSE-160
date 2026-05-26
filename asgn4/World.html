@@ -1,6 +1,11 @@
 <!--
-Justin Bacchus
-jbacchus@ucsc.edu
+  Justin Bacchus | jbacchus@ucsc.edu | CSE 160 - Assignment 4: Lighting
+
+  GRADER NOTES:
+  - The glowing SUN is the SPOTLIGHT (cone cutoff in fragment shader).
+  - POINT LIGHT = yellow marker cube. Moves over time and with Light X/Y/Z sliders.
+  - Point light color: the color swatch. Normals: Normal Visualization buttons.
+  - OBJ model: the low-poly trees.
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -12,12 +17,13 @@ jbacchus@ucsc.edu
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
+      color: #000;
     }
 
     .page {
       display: flex;
       align-items: flex-start;
-      gap: 20px;
+      gap: 28px;
     }
 
     canvas {
@@ -25,38 +31,90 @@ jbacchus@ucsc.edu
     }
 
     .control-panel {
-      width: 500px;
+      width: 640px;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #000;
+    }
+
+    .control-panel h3 {
+      margin: 0 0 16px 0;
+      font-size: 20px;
+      color: #000;
+    }
+
+    .control-panel h4 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #000;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 4px;
+    }
+
+    .control-panel p {
+      margin: 10px 0;
+      color: #000;
+    }
+
+    .notes {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background-color: #fafafa;
+      padding: 14px 18px;
+      margin-bottom: 22px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #000;
+    }
+
+    .notes p { margin: 0 0 8px 0; color: #000; }
+    .notes ul { margin: 0; padding-left: 20px; }
+    .notes li { margin-bottom: 8px; color: #000; }
+
+    .cols {
+      display: flex;
+      gap: 30px;
+    }
+    .col {
+      flex: 1;
     }
 
     .color-control {
       display: inline-block;
       padding: 12px 16px;
-      margin: 10px 0;
-      border: 2px solid black;
+      margin: 8px 0;
+      border: 2px solid #000;
       border-radius: 8px;
       background-color: #f2f2f2;
-      font-size: 18px;
+      font-size: 15px;
       font-weight: bold;
+      color: #000;
     }
 
     #lightColorPicker {
-      width: 75px;
-      height: 45px;
-      margin-left: 10px;
+      width: 60px;
+      height: 36px;
+      margin-left: 12px;
       vertical-align: middle;
       cursor: pointer;
-      border: 2px solid black;
+      border: 2px solid #000;
       padding: 2px;
     }
 
     button {
-      margin: 3px;
-      padding: 5px 10px;
+      margin: 4px 4px 4px 0;
+      padding: 7px 14px;
       cursor: pointer;
+      font-size: 14px;
+      color: #000;
     }
 
     .slider {
       vertical-align: middle;
+      width: 200px;
+      margin-left: 8px;
     }
   </style>
 </head>
@@ -70,89 +128,81 @@ jbacchus@ucsc.edu
     <div class="control-panel">
       <p id="numdot">FPS</p>
 
-      <h3>Controls</h3>
-
-      <p>
-        Move Camera:
-        <b>W</b> Forward,
-        <b>S</b> Backward,
-        <b>A</b> Left,
-        <b>D</b> Right
-      </p>
-
-      <p>
-        Elevation:
-        <b>Q</b> Up,
-        <b>E</b> Down
-      </p>
-
-      <p>
-        Look Around: Hold <b>Middle Mouse</b> and drag
-      </p>
-
-      <p>
-        Shift + Click: To Poke the Sloth
-      </p>
-
-      <p>
-        Camera Angle:
-        <input type="range" min="0" max="360" value="5" class="slider" id="angleSlide">
-      </p>
-
-      <p>
-        Light X
-        <input type="range" min="-250" max="250" value="0" class="slider" id="lightSlideX">
-      </p>
-
-      <p>
-        Light Y
-        <input type="range" min="-250" max="250" value="100" class="slider" id="lightSlideY">
-      </p>
-
-      <p>
-        Light Z
-        <input type="range" min="-250" max="250" value="-200" class="slider" id="lightSlideZ">
-      </p>
-
-      <p>
-        Lighting:
-        <button type="button" id="lightOnButton">ON</button>
-        <button type="button" id="lightOffButton">OFF</button>
-      </p>
-
-      <p>
-        Animation:
-        <button type="button" id="animationYellowOnButton">ON</button>
-        <button type="button" id="animationYellowOffButton">OFF</button>
-      </p>
-
-      <p>
-        <button type="button" id="envToggle">Toggle Environment</button>
-      </p>
-
-      <h4>Lighting</h4>
-
-      <p>
-        Normal Visualization:
-        <button type="button" id="normalOnButton">ON</button>
-        <button type="button" id="normalOffButton">OFF</button>
-      </p>
-
-      <div class="color-control">
-        Pick Point Light Color:
-        <input type="color" id="lightColorPicker" value="#ffffff">
+      <div class="notes">
+        <p><b>GRADER NOTES</b></p>
+        <ul>
+          <li><b>Spotlight:</b> The glowing sun is the spotlight &mdash; toggle with the Spotlight (Sun) buttons. I added a simple day/night cycle for creativity.</li>
+          <li><b>Point Light:</b> The yellow cube marks it. Moves over time and via the Light X/Y/Z sliders. Dragging a slider pauses auto-motion; Light Anim ON resumes it.</li>
+          <li><b>Light Color:</b> The color swatch changes the point light color.</li>
+          <li><b>Normals:</b> The Normal Visualization buttons show normals as color.</li>
+          <li><b>OBJ Model:</b> The low-poly trees are loaded from an OBJ file.</li>
+        </ul>
       </div>
 
-      <p>
-        Spotlight (Sun):
-        <button type="button" id="spotOnButton">ON</button>
-        <button type="button" id="spotOffButton">OFF</button>
-      </p>
+      <h3>Controls</h3>
 
-      <p>
-        <button type="button" id="lightAnimOnButton">Light Anim ON</button>
-        <button type="button" id="lightAnimOffButton">Light Anim OFF</button>
-      </p>
+      <div class="cols">
+        <div class="col">
+          <h4>Camera</h4>
+
+          <p>Move: <b>W</b> Forward, <b>S</b> Back, <b>A</b> Left, <b>D</b> Right</p>
+          <p>Elevation: <b>Q</b> Up, <b>E</b> Down</p>
+          <p>Look Around: hold <b>Left Mouse</b> and drag</p>
+          <p><b>Shift + Click</b>: Poke the Sloth</p>
+
+          <p>Camera Angle
+            <input type="range" min="0" max="360" value="5" class="slider" id="angleSlide">
+          </p>
+
+          <h4>Point Light</h4>
+
+          <p>Light X
+            <input type="range" min="-250" max="250" value="0" class="slider" id="lightSlideX">
+          </p>
+          <p>Light Y
+            <input type="range" min="-250" max="250" value="100" class="slider" id="lightSlideY">
+          </p>
+          <p>Light Z
+            <input type="range" min="-250" max="250" value="-200" class="slider" id="lightSlideZ">
+          </p>
+
+          <p>Motion
+            <button type="button" id="lightAnimOnButton">Light Anim ON</button>
+            <button type="button" id="lightAnimOffButton">Light Anim OFF</button>
+          </p>
+
+          <div class="color-control">
+            Point Light Color (Click Color to Change)
+            <input type="color" id="lightColorPicker" value="#ffffff">
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: lighting toggles + scene -->
+        <div class="col">
+          <h4>Lighting Toggles</h4>
+
+          <p>Point Light 
+            <button type="button" id="lightOnButton">ON</button>
+            <button type="button" id="lightOffButton">OFF</button>
+          </p>
+          <p>Spotlight (Sun)
+            <button type="button" id="spotOnButton">ON</button>
+            <button type="button" id="spotOffButton">OFF</button>
+          </p>
+          <p>Normal Visualization
+            <button type="button" id="normalOnButton">ON</button>
+            <button type="button" id="normalOffButton">OFF</button>
+          </p>
+
+          <h4>Scene</h4>
+
+          <p>Sloth Animation
+            <button type="button" id="animationYellowOnButton">ON</button>
+            <button type="button" id="animationYellowOffButton">OFF</button>
+          </p>
+          <p><button type="button" id="envToggle">Toggle Environment</button></p>
+        </div>
+      </div>
     </div>
   </div>
 

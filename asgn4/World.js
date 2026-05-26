@@ -80,14 +80,17 @@ var FSHADER_SOURCE = `
     if (u_spotOn) {
       vec3 L = normalize(u_spotPos - vec3(v_VertPos));
       vec3 D = normalize(u_spotDir);
+
       float spotCos = dot(-L, D);
-      if (spotCos > 0.85) {                 // inside the cone
-        float nDotL = max(dot(N, L), 0.0);
-        vec3 R = reflect(-L, N);
-        float spec = pow(max(dot(E, R), 0.0), 20.0);
-        vec3 sun = vec3(1.0, 0.85, 0.5);    // warm sun tint
-        total += (baseColor * nDotL * 0.7 + spec) * sun;
-      }
+      float spotAmount = smoothstep(0.82, 0.95, spotCos);
+
+      float nDotL = max(dot(N, L), 0.0);
+      vec3 R = reflect(-L, N);
+      float spec = pow(max(dot(E, R), 0.0), 25.0);
+
+      vec3 sun = vec3(1.0, 0.82, 0.35);
+
+      total += spotAmount * ((baseColor * nDotL * 1.4) + spec * 1.8) * sun;
     }
 
     gl_FragColor = vec4(total, 1.0);
@@ -331,7 +334,7 @@ function addActionsForHtmIUI(){
       ev.preventDefault();
       return;
   }
-  if (ev.button === 1) {               
+  if (ev.button === 0) {               
     g_mouseDragging = true;
     g_lastMouseX = ev.clientX;
     g_lastMouseY = ev.clientY;
@@ -340,7 +343,7 @@ function addActionsForHtmIUI(){
 };
 
   canvas.onmouseup = function(ev) {
-    if (ev.button === 1) g_mouseDragging = false;
+    if (ev.button === 0) g_mouseDragging = false;
   };
 
   canvas.onmouseleave = function(ev) {
@@ -479,12 +482,33 @@ function loadTree() {
 function generateTreePositions(count) {
   g_treePositions = [];
 
-  for (let i = 0; i < count; i++) {
-    let x = -4.5 + Math.random() * 9.0;
-    let z = -4.5 + Math.random() * 9.0;
+  let minDist = 2.8;
+  let attempts = 0;
+  let maxAttempts = count * 80;
 
-    if (Math.abs(x) < 1.2 && Math.abs(z) < 1.2) {
-      i--;
+  while (g_treePositions.length < count && attempts < maxAttempts) {
+    attempts++;
+
+    let x = -4.2 + Math.random() * 8.4;
+    let z = -4.2 + Math.random() * 8.4;
+
+    if (Math.abs(x) < 1.3 && Math.abs(z) < 1.3) {
+      continue;
+    }
+
+    let tooClose = false;
+
+    for (let i = 0; i < g_treePositions.length; i++) {
+      let dx = x - g_treePositions[i].x;
+      let dz = z - g_treePositions[i].z;
+
+      if (dx * dx + dz * dz < minDist * minDist) {
+        tooClose = true;
+        break;
+      }
+    }
+
+    if (tooClose) {
       continue;
     }
 
@@ -492,7 +516,7 @@ function generateTreePositions(count) {
       x: x,
       y: -0.25,
       z: z,
-      scale: 0.08 + Math.random() * 0.06,
+      scale: 0.08 + Math.random() * 0.05,
       rot: Math.random() * 360
     });
   }
@@ -508,7 +532,7 @@ function main() {
   initCubeBuffers();
   addActionsForHtmIUI();
   updateLookDirection();
-  generateTreePositions(4);
+  generateTreePositions(6);
   loadTree(); 
 
   // Specify the color for clearing <canvas>
@@ -530,6 +554,25 @@ function tick(){
   updateAnimationAngles();
   renderAllshapes();
   requestAnimationFrame(tick); 
+}
+
+function getSkyColor() {
+  let h = g_sunPos[1] / 8.0;                          // -1 (below) .. +1 (overhead)
+  let t = Math.max(0, Math.min(1, (h + 0.3) / 1.3));  // remap so sunset sits near horizon
+
+  let night  = [0.04, 0.05, 0.12];
+  let sunset = [0.85, 0.45, 0.25];
+  let day    = [0.53, 0.81, 0.92];
+
+  let c = [0, 0, 0];
+  if (t < 0.5) {
+    let k = t / 0.5;
+    for (let i = 0; i < 3; i++) c[i] = night[i] + (sunset[i] - night[i]) * k;
+  } else {
+    let k = (t - 0.5) / 0.5;
+    for (let i = 0; i < 3; i++) c[i] = sunset[i] + (day[i] - sunset[i]) * k;
+  }
+  return c;
 }
 
 function updateAnimationAngles(){
@@ -590,6 +633,8 @@ for (let i = 0; i < 100; i++) {
   });
 }
 
+let g_rockCube = new Cube();   // global, once
+
 function renderAllshapes(){
   var startTime = performance.now();
   camera();
@@ -598,6 +643,9 @@ function renderAllshapes(){
     .rotate(g_globalAngle, 0, 1, 0)
     .rotate(g_globalAngleY, 1, 0, 0);
   gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
+  let sky = getSkyColor();
+  console.log("sky:", sky, "sunY:", g_sunPos[1]);
+  gl.clearColor(sky[0], sky[1], sky[2], 1.0);
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -626,6 +674,7 @@ function renderAllshapes(){
     return c;
   }
 
+
   function drawFromMatrix(color, matrix, sx, sy, sz, tx, ty, tz) {
     var c = new Cube();
     c.color = color;
@@ -644,16 +693,16 @@ function renderAllshapes(){
     ground.matrix.translate(-0.5, -0.5, -0.5);
     ground.render();
 
+    
     for (let i = 0; i < rocks.length; i++) {
-      var rock = new Cube();
       let shade = rocks[i].shade;
-      rock.color = [shade, shade, shade * 0.95, 1.0];
-      rock.matrix.setTranslate(rocks[i].x, -0.21, rocks[i].z);
-      rock.matrix.rotate(rocks[i].r, 0, 1, 0);
-      rock.matrix.rotate(15, 0, 0, 1);
-      rock.matrix.scale(rocks[i].sx, rocks[i].sy, rocks[i].sz);
-      rock.matrix.translate(-0.5, -0.5, -0.5);
-      rock.render();
+      g_rockCube.color = [shade, shade, shade * 0.95, 1.0];
+      g_rockCube.matrix.setTranslate(rocks[i].x, -0.21, rocks[i].z);
+      g_rockCube.matrix.rotate(rocks[i].r, 0, 1, 0);
+      g_rockCube.matrix.rotate(15, 0, 0, 1);
+      g_rockCube.matrix.scale(rocks[i].sx, rocks[i].sy, rocks[i].sz);
+      g_rockCube.matrix.translate(-0.5, -0.5, -0.5);
+      g_rockCube.render();
     }
   }
 
@@ -667,10 +716,18 @@ function renderAllshapes(){
     g_tree.render();
   }
 }
+
+  var skyDome = new Sphere();
+  skyDome.color = [sky[0], sky[1], sky[2], 1.0];
+  skyDome.textureNum = -4;                 // emissive — no lighting, won't interfere
+  skyDome.matrix.setTranslate(g_cameraX, g_cameraY, g_cameraZ);  // follow camera
+  skyDome.matrix.scale(30, 30, 30);
+  skyDome.render();
+
   var light = new Cube();
   light.color = [2, 2, 0, 1];
   light.matrix.translate(g_lightPos[0], g_lightPos[1], g_lightPos[2]);
-  light.matrix.scale(-.1, -.1, -.1);
+  light.matrix.scale(-.3, -.3, -.3);
   light.matrix.translate(-.5, -.5, -.5);
   light.render();
 
