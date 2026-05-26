@@ -181,12 +181,6 @@ function connectVariablesToGLSL(){
     return;
   }
 
-  u_cameraPos = gl.getUniformLocation(gl.program, 'u_cameraPos');
-  if (!u_cameraPos) {
-    console.log('Failed to get the storage location of u_cameraPos');
-    return;
-  }
-
   // // Get the storage location of a_Position
   a_Position = gl.getAttribLocation(gl.program, 'a_Position');
   if (a_Position < 0) {
@@ -538,9 +532,6 @@ function main() {
   // Specify the color for clearing <canvas>
   gl.clearColor(0.53, 0.81, 0.92, 1.0);
 
-  // Clear <canvas>
-  //gl.clear(gl.COLOR_BUFFER_BIT);
-
   requestAnimationFrame(tick); 
 }
 
@@ -644,7 +635,6 @@ function renderAllshapes(){
     .rotate(g_globalAngleY, 1, 0, 0);
   gl.uniformMatrix4fv(u_GlobalRotateMatrix, false, globalRotMat.elements);
   let sky = getSkyColor();
-  console.log("sky:", sky, "sunY:", g_sunPos[1]);
   gl.clearColor(sky[0], sky[1], sky[2], 1.0);
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -672,18 +662,7 @@ function renderAllshapes(){
     c.matrix.translate(-0.5, -0.5, -0.5);
     c.render();
     return c;
-  }
-
-
-  function drawFromMatrix(color, matrix, sx, sy, sz, tx, ty, tz) {
-    var c = new Cube();
-    c.color = color;
-    c.matrix = new Matrix4(matrix);
-    c.matrix.scale(sx, sy, sz);
-    c.matrix.translate(tx, ty, tz);
-    c.render();
-    return c;
-  }
+  } 
 
   if (g_showEnvironment) {
     var ground = new Cube();
