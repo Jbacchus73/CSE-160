@@ -286,7 +286,33 @@ function main() {
 		});
 	}
 
+	const color = 0xFFFFFF;
+	const intensity = 1;
+	const light = new THREE.DirectionalLight(color, intensity);
+	light.position.set(0, 10, 0);
+	light.target.position.set(-5, 0, 0);
+	scene.add(light);
+	scene.add(light.target);
+
+	class ColorGUIHelper {
+	constructor(object, prop) {
+		this.object = object;
+		this.prop = prop;
+	}
+	get value() {
+		return '#' + this.object[this.prop].getHexString();
+	}
+	set value(hexString) {
+		this.object[this.prop].set(hexString);
+	}
+	}
+
 	const gui = new GUI();
+	gui.addColor(new ColorGUIHelper(light, 'color'), 'value').name('color');
+	gui.add(light, 'intensity', 0, 5, 0.01);
+	gui.add(light.target.position, 'x', -10, 10);
+	gui.add(light.target.position, 'z', -10, 10);
+	gui.add(light.target.position, 'y', 0, 10);
 
 	gui.add(new StringToNumberHelper(texture, 'wrapS'), 'value', wrapModes)
 		.name('texture.wrapS')
