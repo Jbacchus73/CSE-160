@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import Stats from 'three/addons/libs/stats.module.js';
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -9,7 +8,99 @@ import Island from './island.js';
 import DayNight from './daynight.js';
 import Studio from './studio.js';
 import AmbientAudio from './audio.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
+class WalkControls {
+	constructor(camera, domElement, island, {
+		eyeHeight = 1.7,
+		moveSpeed = 5,
+		playerRadius = 0.35,
+		collisionHandler = null,
+	} = {}) {
+		this.camera = camera;
+		this.island = island;
+		this.eyeHeight = eyeHeight;
+		this.moveSpeed = moveSpeed;
+		this.playerRadius = playerRadius;
+		this.collisionHandler = collisionHandler;
+		this.enabled = false;
+
+		this.controls = new PointerLockControls(camera, domElement);
+		this.keys = { forward: false, back: false, left: false, right: false };
+
+		this._onKeyDown = (e) => this._setKey(e.code, true);
+		this._onKeyUp = (e) => this._setKey(e.code, false);
+
+		this.controls.addEventListener('unlock', () => {
+			this.enabled = false;
+			document.removeEventListener('keydown', this._onKeyDown);
+			document.removeEventListener('keyup', this._onKeyUp);
+		});
+	}
+
+	_setKey(code, value) {
+		if (code === 'KeyW' || code === 'ArrowUp') this.keys.forward = value;
+		if (code === 'KeyS' || code === 'ArrowDown') this.keys.back = value;
+		if (code === 'KeyA' || code === 'ArrowLeft') this.keys.left = value;
+		if (code === 'KeyD' || code === 'ArrowRight') this.keys.right = value;
+	}
+
+	enable() {
+		if (this.enabled) return;
+
+		this.enabled = true;
+		this.controls.lock();
+
+		document.addEventListener('keydown', this._onKeyDown);
+		document.addEventListener('keyup', this._onKeyUp);
+
+		if (this.island && typeof this.island.surfaceY === 'number') {
+			this.camera.position.y = this.island.surfaceY + this.eyeHeight;
+		} else {
+			this.camera.position.y = this.eyeHeight;
+		}
+	}
+
+	disable() {
+		this.enabled = false;
+		this.controls.unlock();
+
+		document.removeEventListener('keydown', this._onKeyDown);
+		document.removeEventListener('keyup', this._onKeyUp);
+	}
+
+	update(delta) {
+		if (!this.enabled) return;
+
+		const inputX = Number(this.keys.right) - Number(this.keys.left);
+		const inputZ = Number(this.keys.forward) - Number(this.keys.back);
+		const inputLength = Math.hypot(inputX, inputZ);
+
+		if (inputLength > 0) {
+			const dist = this.moveSpeed * delta;
+			this.controls.moveRight((inputX / inputLength) * dist);
+			this.controls.moveForward((inputZ / inputLength) * dist);
+		}
+
+		if (this.island && typeof this.island.clampPosition === 'function') {
+			this.island.clampPosition(this.camera.position);
+		}
+
+		if (typeof this.collisionHandler === 'function') {
+			this.collisionHandler(this.camera.position, this.playerRadius);
+		}
+
+		if (this.island && typeof this.island.clampPosition === 'function') {
+			this.island.clampPosition(this.camera.position);
+		}
+
+		if (this.island && typeof this.island.surfaceY === 'number') {
+			this.camera.position.y = this.island.surfaceY + this.eyeHeight;
+		} else {
+			this.camera.position.y = this.eyeHeight;
+		}
+	}
+}
 
 function main() {
 	const canvas = document.querySelector('#c');
@@ -19,13 +110,12 @@ function main() {
 		canvas,
 	});
 
-	// OPTIMIZATION: cap pixel ratio (Retina renders 4x pixels otherwise)
-	renderer.setPixelRatio(1);	
+	renderer.setPixelRatio(1);
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 	renderer.toneMapping = THREE.ACESFilmicToneMapping;
 	renderer.toneMappingExposure = 1.2;
 	renderer.shadowMap.enabled = true;
-	renderer.shadowMap.type = THREE.PCFShadowMap;
+	renderer.shadowMap.type = THREE.BasicShadowMap;
 
 	const stats = new Stats();
 	stats.showPanel(0);
@@ -35,13 +125,7 @@ function main() {
 	scene.background = new THREE.Color(0x87ceeb);
 
 	const camera = new THREE.PerspectiveCamera(75, 2, 0.1, 200);
-	camera.position.set(0, 8, 14);
-
-	const orbitControls = new OrbitControls(camera, renderer.domElement);
-	orbitControls.target.set(0, 0, 0);
-	orbitControls.enableDamping = true;
-	orbitControls.dampingFactor = 0.05;
-	orbitControls.update();
+	camera.position.set(0, 1.7, 8);
 
 	const spectatorControls = new SpectatorControls(camera, renderer.domElement, {
 		moveSpeed: 6,
@@ -67,25 +151,9 @@ function main() {
 	window.addEventListener('click', startAmbientAudio);
 	window.addEventListener('keydown', startAmbientAudio);
 
-	let activeControls = 'orbit';
+	let activeControls = 'walk';
 
 	const switchButton = document.querySelector('#switchControls');
-
-	if (switchButton) {
-		switchButton.addEventListener('click', () => {
-			if (activeControls === 'orbit') {
-				activeControls = 'spectator';
-				orbitControls.enabled = false;
-				spectatorControls.enable();
-				switchButton.textContent = 'Switch to Orbit Controls';
-			} else {
-				activeControls = 'orbit';
-				spectatorControls.disable();
-				orbitControls.enabled = true;
-				switchButton.textContent = 'Switch to Free Roam Controls';
-			}
-		});
-	}
 
 	const clock = new THREE.Clock();
 
@@ -107,26 +175,219 @@ function main() {
 		progressBarElem.style.transform = `scaleX(${progress})`;
 	};
 
-	function frameArea(sizeToFitOnScreen, boxSize, boxCenter, camera) {
-		const halfSizeToFitOnScreen = sizeToFitOnScreen * 0.5;
-		const halfFovY = THREE.MathUtils.degToRad(camera.fov * 0.5);
-		const distance = halfSizeToFitOnScreen / Math.tan(halfFovY);
+	const collisionObjects = {
+		treeCircles: [],
+		house: {
+			x: 5,
+			z: -10.5,
+			width: 7.2,
+			depth: 5.8,
+			rotationY: -0.12,
+			wallThickness: 0.42,
+			doorCenterX: 7.2 * 0.19,
+			doorwayWidth: 7.2 * 0.16,
+		},
+	};
 
-		const direction = new THREE.Vector3()
-			.subVectors(camera.position, boxCenter)
-			.multiply(new THREE.Vector3(1, 0, 1));
+	const cullables = [];
+	const cullingFrustum = new THREE.Frustum();
+	const cullingMatrix = new THREE.Matrix4();
+	const cullingSphere = new THREE.Sphere();
+	const DEBUG_CULLING = true;
 
-		if (direction.lengthSq() === 0) {
-			direction.set(0, 0, 1);
+	function addCullable(object, {
+		maxDistance = 60,
+		extraMargin = 1.2,
+		minRadius = 2,
+	} = {}) {
+		const box = new THREE.Box3().setFromObject(object);
+		const sphere = box.getBoundingSphere(new THREE.Sphere());
+
+		cullables.push({
+			object,
+			center: sphere.center.clone(),
+			radius: Math.max(sphere.radius * extraMargin, minRadius),
+			maxDistance,
+		});
+	}
+
+	function updateCulling(camera) {
+		camera.updateMatrixWorld();
+		cullingMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+		cullingFrustum.setFromProjectionMatrix(cullingMatrix);
+
+		let visibleCount = 0;
+
+		for (const item of cullables) {
+			if (!item.object) continue;
+
+			const distanceSq = camera.position.distanceToSquared(item.center);
+			const maxDistanceSq = item.maxDistance * item.maxDistance;
+
+			if (distanceSq > maxDistanceSq) {
+				item.object.visible = false;
+			} else {
+				cullingSphere.center.copy(item.center);
+				cullingSphere.radius = item.radius;
+				item.object.visible = cullingFrustum.intersectsSphere(cullingSphere);
+			}
+
+			if (item.object.visible) visibleCount++;
 		}
 
-		direction.normalize();
+		if (DEBUG_CULLING) {
+			let grassText = '';
 
-		camera.position.copy(direction.multiplyScalar(distance).add(boxCenter));
-		camera.near = boxSize / 100;
-		camera.far = boxSize * 100;
-		camera.updateProjectionMatrix();
-		camera.lookAt(boxCenter.x, boxCenter.y, boxCenter.z);
+			if (island && typeof island.getGrassCullingStats === 'function') {
+				const grassStats = island.getGrassCullingStats();
+				grassText = ` | grass chunks: ${grassStats.visible} / ${grassStats.total}`;
+			}
+
+			console.log(`visible cullables: ${visibleCount} / ${cullables.length}${grassText}`);
+		}
+	}
+
+	function worldToHouseLocal(position, house) {
+		const dx = position.x - house.x;
+		const dz = position.z - house.z;
+		const c = Math.cos(house.rotationY);
+		const s = Math.sin(house.rotationY);
+
+		return {
+			x: c * dx - s * dz,
+			z: s * dx + c * dz,
+		};
+	}
+
+	function houseLocalToWorld(local, house) {
+		const c = Math.cos(house.rotationY);
+		const s = Math.sin(house.rotationY);
+
+		return {
+			x: house.x + c * local.x + s * local.z,
+			z: house.z - s * local.x + c * local.z,
+		};
+	}
+
+	function pushCircleOutOfRectLocal(point, rect, radius) {
+		const closestX = THREE.MathUtils.clamp(point.x, rect.minX, rect.maxX);
+		const closestZ = THREE.MathUtils.clamp(point.z, rect.minZ, rect.maxZ);
+
+		const dx = point.x - closestX;
+		const dz = point.z - closestZ;
+		const distSq = dx * dx + dz * dz;
+
+		if (distSq > 0 && distSq < radius * radius) {
+			const dist = Math.sqrt(distSq);
+			const push = radius - dist;
+			point.x += (dx / dist) * push;
+			point.z += (dz / dist) * push;
+			return true;
+		}
+
+		if (
+			point.x >= rect.minX &&
+			point.x <= rect.maxX &&
+			point.z >= rect.minZ &&
+			point.z <= rect.maxZ
+		) {
+			const left = Math.abs(point.x - rect.minX);
+			const right = Math.abs(rect.maxX - point.x);
+			const bottom = Math.abs(point.z - rect.minZ);
+			const top = Math.abs(rect.maxZ - point.z);
+			const min = Math.min(left, right, bottom, top);
+
+			if (min === left) point.x = rect.minX - radius;
+			else if (min === right) point.x = rect.maxX + radius;
+			else if (min === bottom) point.z = rect.minZ - radius;
+			else point.z = rect.maxZ + radius;
+
+			return true;
+		}
+
+		return false;
+	}
+
+	function collideWithTrees(position, radius) {
+		for (const tree of collisionObjects.treeCircles) {
+			const dx = position.x - tree.x;
+			const dz = position.z - tree.z;
+			const minDist = radius + tree.radius;
+			const distSq = dx * dx + dz * dz;
+
+			if (distSq > 0 && distSq < minDist * minDist) {
+				const dist = Math.sqrt(distSq);
+				const push = minDist - dist;
+				position.x += (dx / dist) * push;
+				position.z += (dz / dist) * push;
+			}
+		}
+	}
+
+	function collideWithHouse(position, radius) {
+		const house = collisionObjects.house;
+		const local = worldToHouseLocal(position, house);
+
+		const halfW = house.width / 2;
+		const halfD = house.depth / 2;
+		const t = house.wallThickness;
+
+		const doorLeft = house.doorCenterX - house.doorwayWidth / 2;
+		const doorRight = house.doorCenterX + house.doorwayWidth / 2;
+
+		const wallRects = [
+			{
+				minX: -halfW - t / 2,
+				maxX: -halfW + t / 2,
+				minZ: -halfD,
+				maxZ: halfD,
+			},
+			{
+				minX: halfW - t / 2,
+				maxX: halfW + t / 2,
+				minZ: -halfD,
+				maxZ: halfD,
+			},
+			{
+				minX: -halfW,
+				maxX: halfW,
+				minZ: -halfD - t / 2,
+				maxZ: -halfD + t / 2,
+			},
+			{
+				minX: -halfW,
+				maxX: doorLeft,
+				minZ: halfD - t / 2,
+				maxZ: halfD + t / 2,
+			},
+			{
+				minX: doorRight,
+				maxX: halfW,
+				minZ: halfD - t / 2,
+				maxZ: halfD + t / 2,
+			},
+		];
+
+		let changed = false;
+
+		for (const rect of wallRects) {
+			if (pushCircleOutOfRectLocal(local, rect, radius)) {
+				changed = true;
+			}
+		}
+
+		if (changed) {
+			const world = houseLocalToWorld(local, house);
+			position.x = world.x;
+			position.z = world.z;
+		}
+	}
+
+	function applyWorldCollisions(position, radius) {
+		for (let i = 0; i < 3; i++) {
+			collideWithTrees(position, radius);
+			collideWithHouse(position, radius);
+		}
 	}
 
 	const island = new Island(scene, textureLoader, {
@@ -150,21 +411,59 @@ function main() {
 		grassLeanAmount: 0.55,
 		grassMinSpacing: 0.12,
 
-		// grass shadows ON
 		grassCastShadow: true,
 		grassReceiveShadow: true,
 
 		autoGenerateGrass: true,
 	});
 
+	camera.position.set(0, island.surfaceY + 1.7, 8);
+
+	const walkControls = new WalkControls(camera, renderer.domElement, island, {
+		eyeHeight: 1.7,
+		moveSpeed: 5,
+		playerRadius: 0.35,
+		collisionHandler: applyWorldCollisions,
+	});
+
+	renderer.domElement.addEventListener('click', () => {
+		if (activeControls === 'walk') {
+			walkControls.enable();
+		}
+	});
+
+	if (switchButton) {
+		switchButton.textContent = 'Switch to Free Roam Controls';
+
+		switchButton.addEventListener('click', () => {
+			if (activeControls === 'walk') {
+				activeControls = 'spectator';
+				walkControls.disable();
+				spectatorControls.enable();
+				switchButton.textContent = 'Switch to Walk Controls';
+			} else {
+				activeControls = 'walk';
+				spectatorControls.disable();
+				walkControls.enable();
+				switchButton.textContent = 'Switch to Free Roam Controls';
+			}
+		});
+	}
+
 	const studio = new Studio(scene, {
-		x: 5,
+		x: collisionObjects.house.x,
 		y: island.surfaceY,
-		z: -10.5,
-		width: 7.2,
-		depth: 5.8,
+		z: collisionObjects.house.z,
+		width: collisionObjects.house.width,
+		depth: collisionObjects.house.depth,
 		height: 2.6,
-		rotationY: -0.12,
+		rotationY: collisionObjects.house.rotationY,
+	});
+
+	addCullable(studio.group, {
+		maxDistance: 55,
+		extraMargin: 1.35,
+		minRadius: 8,
 	});
 
 	if (typeof island.addGrassBlockerCircle === 'function') {
@@ -179,11 +478,10 @@ function main() {
 		ambientDayIntensity: 1.1,
 		ambientNightIntensity: 0.18,
 
-		// updated shadow settings for crisp, stable grass shadows
 		enableShadows: true,
-		shadowSize: 4098,          // power of two
-		shadowCameraSize: 18,      // covers the radius-16 island
-		shadowFollowCamera: true,  // keeps shadows dense where you look
+		shadowSize: 2048,
+		shadowCameraSize: 18,
+		shadowFollowCamera: true,
 
 		textureLoader,
 		skyRadius: 120,
@@ -234,19 +532,15 @@ function main() {
 
 					scene.add(root);
 
+					addCullable(root, {
+						maxDistance: 45,
+						extraMargin: 1.25,
+						minRadius: 4,
+					});
+
 					if (typeof island.addGrassBlockerCircle === 'function') {
 						island.addGrassBlockerCircle(-2, 0, 3.5);
 					}
-
-					const box = new THREE.Box3().setFromObject(root);
-					const boxSize = box.getSize(new THREE.Vector3()).length();
-					const boxCenter = box.getCenter(new THREE.Vector3());
-
-					frameArea(boxSize * 1.2, boxSize, boxCenter, camera);
-
-					orbitControls.maxDistance = boxSize * 10;
-					orbitControls.target.copy(boxCenter);
-					orbitControls.update();
 
 					resolve(root);
 				},
@@ -437,6 +731,7 @@ function main() {
 
 					const angle = Math.random() * Math.PI * 2;
 					let dist;
+
 					if (Math.random() < 0.65) {
 						dist = THREE.MathUtils.randFloat(8.0, maxRadius);
 					} else {
@@ -447,6 +742,7 @@ function main() {
 					const z = Math.sin(angle) * dist;
 
 					let tooClose = false;
+
 					for (const blocked of blockedAreas) {
 						const dx = x - blocked.x;
 						const dz = z - blocked.z;
@@ -455,6 +751,7 @@ function main() {
 							break;
 						}
 					}
+
 					if (tooClose) continue;
 
 					for (const p of treePositions) {
@@ -466,6 +763,7 @@ function main() {
 							break;
 						}
 					}
+
 					if (tooClose) continue;
 
 					const tree = root.clone(true);
@@ -480,12 +778,26 @@ function main() {
 					);
 
 					scene.add(tree);
+
 					tree.matrixAutoUpdate = false;
 					tree.updateMatrix();
+					tree.updateMatrixWorld(true);
+
+					addCullable(tree, {
+						maxDistance: 60,
+						extraMargin: 1.35,
+						minRadius: 4,
+					});
 
 					if (typeof island.addGrassBlockerCircle === 'function') {
 						island.addGrassBlockerCircle(x, z, blockerRadius);
 					}
+
+					collisionObjects.treeCircles.push({
+						x,
+						z,
+						radius: 0.75 * scale,
+					});
 
 					treePositions.push({ x, z });
 					placed++;
@@ -517,7 +829,6 @@ function main() {
 		}
 	});
 
-	// ---- GUI (defensive: only add controls for properties that exist) ----
 	const gui = new GUI();
 
 	const dayNightFolder = gui.addFolder('Day Night Cycle');
@@ -543,6 +854,7 @@ function main() {
 	safeAdd(grassFolder, island, 'grassScaleMax', 0.1, 4, 0.01)?.name('scale max');
 	safeAdd(grassFolder, island, 'grassEdgeMargin', 0, 5, 0.01)?.name('edge margin');
 	safeAdd(grassFolder, island, 'grassMinSpacing', 0.05, 1, 0.01)?.name('spacing');
+
 	if (typeof island.generateGrass === 'function') {
 		grassFolder.add({ regenerate: () => island.generateGrass(true) }, 'regenerate').name('regenerate grass');
 	}
@@ -571,15 +883,24 @@ function main() {
 		}
 
 		const delta = clock.getDelta();
-		ambient.update(delta);
 
+		ambient.update(delta);
 		dayNight.update(delta, camera);
 
-		if (activeControls === 'orbit') {
-			orbitControls.update();
-		} else {
+		const isNight = dayNight.getCycleTime() > 0.45 && dayNight.getCycleTime() < 0.88;
+		studio.setPorchLights(isNight);
+
+		if (activeControls === 'spectator') {
 			spectatorControls.update(delta);
 			island.clampPosition(camera.position);
+		} else if (activeControls === 'walk') {
+			walkControls.update(delta);
+		}
+
+		updateCulling(camera);
+
+		if (typeof island.updateGrassCulling === 'function') {
+			island.updateGrassCulling(camera);
 		}
 
 		renderer.render(scene, camera);

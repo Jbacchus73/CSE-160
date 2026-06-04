@@ -30,6 +30,11 @@ export default class Island {
 		grassCastShadow = false,
 		grassReceiveShadow = true,
 
+		grassChunkSize = 4.5,
+		grassCullMaxDistance = 20,
+		grassCullExtraMargin = 1.05,
+		grassCullingDebug = false,
+
 		autoGenerateGrass = false,
 	} = {}) {
 		this.radius = radius;
@@ -56,10 +61,20 @@ export default class Island {
 		this.grassCastShadow = grassCastShadow;
 		this.grassReceiveShadow = grassReceiveShadow;
 
+		this.grassChunkSize = grassChunkSize;
+		this.grassCullMaxDistance = grassCullMaxDistance;
+		this.grassCullExtraMargin = grassCullExtraMargin;
+		this.grassCullingDebug = grassCullingDebug;
+
 		this.grassBlockers = [];
 		this.grassGroup = null;
+		this.grassChunks = [];
 		this.grassGenerated = false;
 		this.grassLoading = false;
+
+		this._grassFrustum = new THREE.Frustum();
+		this._grassFrustumMatrix = new THREE.Matrix4();
+		this._grassSphere = new THREE.Sphere();
 
 		const topGeo = this._makeIslandTopGeometry(radius, height, segments);
 
@@ -73,8 +88,8 @@ export default class Island {
 		this.mesh.position.y = height / 2;
 		this.mesh.receiveShadow = true;
 		scene.add(this.mesh);
-        this.mesh.matrixAutoUpdate = false;
-        this.mesh.updateMatrix();
+		this.mesh.matrixAutoUpdate = false;
+		this.mesh.updateMatrix();
 
 		const sideHeight = height * 2.2;
 		const cliffTex = this._makeCliffTexture(512);
@@ -104,8 +119,8 @@ export default class Island {
 		this.side.position.y = -sideHeight / 2 + height / 2;
 		this.side.receiveShadow = true;
 		scene.add(this.side);
-        this.side.matrixAutoUpdate = false;
-        this.side.updateMatrix();
+		this.side.matrixAutoUpdate = false;
+		this.side.updateMatrix();
 
 		if (autoGenerateGrass) {
 			this.generateGrass();
@@ -134,17 +149,59 @@ export default class Island {
 		this._loadGrassObjects(this.grassObjPath);
 	}
 
+	updateGrassCulling(camera) {
+		if (!this.grassGroup || this.grassChunks.length === 0) return;
+
+		camera.updateMatrixWorld();
+		this._grassFrustumMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+		this._grassFrustum.setFromProjectionMatrix(this._grassFrustumMatrix);
+
+		let visibleCount = 0;
+		const maxDistanceSq = this.grassCullMaxDistance * this.grassCullMaxDistance;
+
+		for (const chunk of this.grassChunks) {
+			const distanceSq = camera.position.distanceToSquared(chunk.center);
+
+			if (distanceSq > maxDistanceSq) {
+				chunk.group.visible = false;
+				continue;
+			}
+
+			this._grassSphere.center.copy(chunk.center);
+			this._grassSphere.radius = chunk.radius;
+
+			chunk.group.visible = this._grassFrustum.intersectsSphere(this._grassSphere);
+
+			if (chunk.group.visible) visibleCount++;
+		}
+
+		this.lastGrassVisibleChunks = visibleCount;
+		this.lastGrassTotalChunks = this.grassChunks.length;
+
+		if (this.grassCullingDebug) {
+			console.log('visible grass chunks:', visibleCount, '/', this.grassChunks.length);
+		}
+	}
+
+	getGrassCullingStats() {
+		return {
+			visible: this.lastGrassVisibleChunks || 0,
+			total: this.lastGrassTotalChunks || this.grassChunks.length,
+		};
+	}
+
 	_clearGrass() {
 		if (!this.grassGroup) {
+			this.grassChunks = [];
 			this.grassGenerated = false;
 			this.grassLoading = false;
 			return;
 		}
 
-		// dispose instanced meshes to free GPU memory
 		this.grassGroup.traverse((child) => {
 			if (child.isInstancedMesh) {
 				child.geometry.dispose();
+
 				if (Array.isArray(child.material)) {
 					child.material.forEach((m) => m.dispose());
 				} else if (child.material) {
@@ -155,6 +212,7 @@ export default class Island {
 
 		this.scene.remove(this.grassGroup);
 		this.grassGroup = null;
+		this.grassChunks = [];
 		this.grassGenerated = false;
 		this.grassLoading = false;
 	}
@@ -202,7 +260,6 @@ export default class Island {
 			(root) => {
 				console.log('Grass OBJ loaded:', grassObjPath);
 
-				// center horizontally + sit base at y=0 (same as before)
 				const box = new THREE.Box3().setFromObject(root);
 				const center = box.getCenter(new THREE.Vector3());
 				root.position.x -= center.x;
@@ -210,20 +267,11 @@ export default class Island {
 				root.position.y -= box.min.y;
 				root.updateMatrixWorld(true);
 
-				// collect every mesh's geometry (baked with its world transform)
-				// so a multi-mesh OBJ still instances correctly.
-				const grassMat = new THREE.MeshStandardMaterial({
-					color: 0x5faa3f,
-					roughness: 1,
-					metalness: 0,
-					side: THREE.DoubleSide,
-				});
-
 				const sourceGeometries = [];
 				root.traverse((child) => {
 					if (child.isMesh) {
 						const g = child.geometry.clone();
-						g.applyMatrix4(child.matrixWorld); // bake offset/rotation into verts
+						g.applyMatrix4(child.matrixWorld);
 						sourceGeometries.push(g);
 					}
 				});
@@ -237,8 +285,6 @@ export default class Island {
 				this.grassGroup = new THREE.Group();
 				this.scene.add(this.grassGroup);
 
-				// ---- placement: identical logic to before, but we record
-				//      transforms into an array instead of cloning meshes ----
 				const placed = [];
 				const transforms = [];
 				const usableRadius = this.radius - this.grassEdgeMargin;
@@ -309,39 +355,18 @@ export default class Island {
 					spawnGrass(px, pz, THREE.MathUtils.randFloat(0.55, 1.1));
 				}
 
-				// ---- build one InstancedMesh per source geometry ----
-				const dummy = new THREE.Object3D();
-				const count = transforms.length;
+				this._buildGrassChunks(sourceGeometries, transforms);
 
-				for (const geo of sourceGeometries) {
-					const inst = new THREE.InstancedMesh(geo, grassMat, count);
-					inst.castShadow = this.grassCastShadow;
-					inst.receiveShadow = this.grassReceiveShadow;
-					inst.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+				this.grassGroup.matrixAutoUpdate = false;
+				this.grassGroup.updateMatrix();
 
-					for (let i = 0; i < count; i++) {
-						const t = transforms[i];
-						dummy.position.set(t.x, t.y, t.z);
-						dummy.rotation.set(t.rx, t.ry, t.rz);
-						dummy.scale.set(t.sx, t.sy, t.sz);
-						dummy.updateMatrix();
-						inst.setMatrixAt(i, dummy.matrix);
-					}
-					inst.instanceMatrix.needsUpdate = true;
-                    inst.matrixAutoUpdate = false;
-                    inst.updateMatrix();
-
-                    this.grassGroup.add(inst)
-				}
-
-                this.grassGroup.matrixAutoUpdate = false;
-                this.grassGroup.updateMatrix();
 				this.grassGenerated = true;
 				this.grassLoading = false;
 
 				console.log(
-					'Grass placed:', count,
-					'| draw calls:', sourceGeometries.length
+					'Grass placed:', transforms.length,
+					'| chunks:', this.grassChunks.length,
+					'| source geometries:', sourceGeometries.length
 				);
 			},
 			undefined,
@@ -350,6 +375,102 @@ export default class Island {
 				console.error('Failed to load grass OBJ:', grassObjPath, error);
 			}
 		);
+	}
+
+	_buildGrassChunks(sourceGeometries, transforms) {
+		const chunkMap = new Map();
+		const chunkSize = this.grassChunkSize;
+
+		for (const transform of transforms) {
+			const cx = Math.floor(transform.x / chunkSize);
+			const cz = Math.floor(transform.z / chunkSize);
+			const key = `${cx},${cz}`;
+
+			if (!chunkMap.has(key)) {
+				chunkMap.set(key, {
+					key,
+					transforms: [],
+					minX: Infinity,
+					maxX: -Infinity,
+					minY: Infinity,
+					maxY: -Infinity,
+					minZ: Infinity,
+					maxZ: -Infinity,
+				});
+			}
+
+			const chunk = chunkMap.get(key);
+			chunk.transforms.push(transform);
+
+			const roughSize = Math.max(transform.sx, transform.sy, transform.sz) * 1.8;
+
+			chunk.minX = Math.min(chunk.minX, transform.x - roughSize);
+			chunk.maxX = Math.max(chunk.maxX, transform.x + roughSize);
+			chunk.minY = Math.min(chunk.minY, transform.y - roughSize);
+			chunk.maxY = Math.max(chunk.maxY, transform.y + roughSize);
+			chunk.minZ = Math.min(chunk.minZ, transform.z - roughSize);
+			chunk.maxZ = Math.max(chunk.maxZ, transform.z + roughSize);
+		}
+
+		const dummy = new THREE.Object3D();
+
+		for (const chunkData of chunkMap.values()) {
+			const chunkGroup = new THREE.Group();
+			chunkGroup.matrixAutoUpdate = false;
+			chunkGroup.updateMatrix();
+
+			const count = chunkData.transforms.length;
+
+			const grassMat = new THREE.MeshStandardMaterial({
+				color: 0x5faa3f,
+				roughness: 1,
+				metalness: 0,
+				side: THREE.DoubleSide,
+			});
+
+			for (const geo of sourceGeometries) {
+				const inst = new THREE.InstancedMesh(geo.clone(), grassMat.clone(), count);
+				inst.castShadow = this.grassCastShadow;
+				inst.receiveShadow = this.grassReceiveShadow;
+				inst.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+
+				for (let i = 0; i < count; i++) {
+					const t = chunkData.transforms[i];
+					dummy.position.set(t.x, t.y, t.z);
+					dummy.rotation.set(t.rx, t.ry, t.rz);
+					dummy.scale.set(t.sx, t.sy, t.sz);
+					dummy.updateMatrix();
+					inst.setMatrixAt(i, dummy.matrix);
+				}
+
+				inst.instanceMatrix.needsUpdate = true;
+				inst.matrixAutoUpdate = false;
+				inst.updateMatrix();
+
+				chunkGroup.add(inst);
+			}
+
+			const center = new THREE.Vector3(
+				(chunkData.minX + chunkData.maxX) / 2,
+				(chunkData.minY + chunkData.maxY) / 2,
+				(chunkData.minZ + chunkData.maxZ) / 2
+			);
+
+			const radius = center.distanceTo(new THREE.Vector3(
+				chunkData.maxX,
+				chunkData.maxY,
+				chunkData.maxZ
+			)) * this.grassCullExtraMargin;
+
+			this.grassGroup.add(chunkGroup);
+
+			this.grassChunks.push({
+				group: chunkGroup,
+				center,
+				radius,
+				count,
+			});
+		}
 	}
 
 	_isValidGrassPoint(x, z) {
@@ -385,6 +506,7 @@ export default class Island {
 				return false;
 			}
 		}
+
 		return true;
 	}
 
