@@ -15,38 +15,63 @@ export default class Studio {
 		wallTexturePath = 'obj/textures/woodPlanks/',
 		roofTexturePath = 'obj/textures/WoodRoof/',
 
-		wallTilesPerUnit = 0.42,
-		roofTilesPerUnit = 0.55,
+		wallTextureRepeatX = 2.4,
+		wallTextureRepeatY = 1.25,
+		roofTextureRepeatX = 3.6,
+		roofTextureRepeatY = 2.8,
 	} = {}) {
 		this.group = new THREE.Group();
 		this.textureLoader = new THREE.TextureLoader();
 
-		this.wallTilesPerUnit = wallTilesPerUnit;
-		this.roofTilesPerUnit = roofTilesPerUnit;
+		const wallMaterial = this.createWallMaterial(
+			wallTexturePath,
+			wallTextureRepeatX,
+			wallTextureRepeatY
+		);
 
-		const wallMaterial = this.createWallMaterial(wallTexturePath);
-		const roofMaterial = this.createRoofMaterial(roofTexturePath);
+		const roofMaterial = this.createRoofMaterial(
+			roofTexturePath,
+			roofTextureRepeatX,
+			roofTextureRepeatY
+		);
 
 		const roofUnderMaterial = new THREE.MeshStandardMaterial({
-			color: 0x4b392a, roughness: 0.96, metalness: 0, side: THREE.BackSide,
+			color: 0x4b392a,
+			roughness: 0.96,
+			metalness: 0,
+			side: THREE.BackSide,
 		});
+
 		const trimMaterial = new THREE.MeshStandardMaterial({
-			color: 0x5b4731, roughness: 0.95, metalness: 0,
+			color: 0x5b4731,
+			roughness: 0.95,
+			metalness: 0,
 		});
+
 		const frameMaterial = new THREE.MeshStandardMaterial({
-			color: 0x3e2a1c, roughness: 0.95, metalness: 0,
+			color: 0x3e2a1c,
+			roughness: 0.95,
+			metalness: 0,
 		});
+
 		const floorMaterial = new THREE.MeshStandardMaterial({
-			color: 0x4a3726, roughness: 0.98, metalness: 0,
+			color: 0x4a3726,
+			roughness: 0.98,
+			metalness: 0,
 		});
+
 		const interiorCeilingMaterial = new THREE.MeshStandardMaterial({
-			color: 0x5a4635, roughness: 0.95, metalness: 0,
+			color: 0x5a4635,
+			roughness: 0.95,
+			metalness: 0,
 		});
 
 		const wallThickness = 0.18;
+
 		const doorwayWidth = width * 0.16;
 		const doorwayHeight = height * 0.78;
 		const doorCenterX = width * 0.19;
+
 		const windowWidth = width * 0.17;
 		const windowHeight = height * 0.24;
 		const windowCenterX = -width * 0.23;
@@ -56,34 +81,55 @@ export default class Studio {
 		floor.position.set(0, 0.07, 0);
 		this.group.add(floor);
 
-		const backWall = this.createWallBox(width, height, wallThickness, wallMaterial);
+		const backWall = this.createBox(width, height, wallThickness, wallMaterial);
 		backWall.position.set(0, height / 2, -depth / 2);
 		this.group.add(backWall);
 
-		const leftWall = this.createWallBox(wallThickness, height, depth, wallMaterial);
+		const leftWall = this.createBox(wallThickness, height, depth, wallMaterial);
 		leftWall.position.set(-width / 2, height / 2, 0);
 		this.group.add(leftWall);
 
-		const rightWall = this.createWallBox(wallThickness, height, depth, wallMaterial);
+		const rightWall = this.createBox(wallThickness, height, depth, wallMaterial);
 		rightWall.position.set(width / 2, height / 2, 0);
 		this.group.add(rightWall);
 
 		this.addFrontWallWithOpenings({
-			width, height, depth, wallThickness, wallMaterial,
-			doorCenterX, doorwayWidth, doorwayHeight,
-			windowCenterX, windowCenterY, windowWidth, windowHeight,
+			width,
+			height,
+			depth,
+			wallThickness,
+			wallMaterial,
+			doorCenterX,
+			doorwayWidth,
+			doorwayHeight,
+			windowCenterX,
+			windowCenterY,
+			windowWidth,
+			windowHeight,
 		});
 
 		const leftDoorFrame = this.createBox(0.16, doorwayHeight, 0.26, frameMaterial);
-		leftDoorFrame.position.set(doorCenterX - doorwayWidth / 2, doorwayHeight / 2, depth / 2 + 0.05);
+		leftDoorFrame.position.set(
+			doorCenterX - doorwayWidth / 2,
+			doorwayHeight / 2,
+			depth / 2 + 0.05
+		);
 		this.group.add(leftDoorFrame);
 
 		const rightDoorFrame = this.createBox(0.16, doorwayHeight, 0.26, frameMaterial);
-		rightDoorFrame.position.set(doorCenterX + doorwayWidth / 2, doorwayHeight / 2, depth / 2 + 0.05);
+		rightDoorFrame.position.set(
+			doorCenterX + doorwayWidth / 2,
+			doorwayHeight / 2,
+			depth / 2 + 0.05
+		);
 		this.group.add(rightDoorFrame);
 
 		const topDoorFrame = this.createBox(doorwayWidth + 0.14, 0.16, 0.26, frameMaterial);
-		topDoorFrame.position.set(doorCenterX, doorwayHeight, depth / 2 + 0.05);
+		topDoorFrame.position.set(
+			doorCenterX,
+			doorwayHeight,
+			depth / 2 + 0.05
+		);
 		this.group.add(topDoorFrame);
 
 		const doorStep = this.createBox(doorwayWidth + 0.75, 0.12, 0.58, trimMaterial);
@@ -91,8 +137,14 @@ export default class Studio {
 		this.group.add(doorStep);
 
 		this.addOpenWindow({
-			x: windowCenterX, y: windowCenterY, z: depth / 2,
-			w: windowWidth, h: windowHeight, wallThickness, frameMaterial, trimMaterial,
+			x: windowCenterX,
+			y: windowCenterY,
+			z: depth / 2,
+			w: windowWidth,
+			h: windowHeight,
+			wallThickness,
+			frameMaterial,
+			trimMaterial,
 		});
 
 		this.addCornerTrim(width, depth, height, trimMaterial);
@@ -102,15 +154,20 @@ export default class Studio {
 		ceiling.position.set(0, height - 0.04, 0);
 		this.group.add(ceiling);
 
-		const roof = this.createHipRoofAssembly(width, depth, 1.8, 0.6, roofMaterial, roofUnderMaterial);
+		const roof = this.createHipRoofAssembly(
+			width,
+			depth,
+			1.8,
+			0.6,
+			roofMaterial,
+			roofUnderMaterial
+		);
 		roof.position.y = height + 0.04;
 		this.group.add(roof);
 
 		const chimney = this.createBox(0.34, 0.95, 0.34, trimMaterial);
 		chimney.position.set(0.05, height + 1.0, -depth * 0.08);
 		this.group.add(chimney);
-
-		this.addDesk(width, depth, height);
 
 		this.group.position.set(x, y, z);
 		this.group.rotation.y = rotationY;
@@ -119,13 +176,24 @@ export default class Studio {
 	}
 
 	addFrontWallWithOpenings({
-		width, height, depth, wallThickness, wallMaterial,
-		doorCenterX, doorwayWidth, doorwayHeight,
-		windowCenterX, windowCenterY, windowWidth, windowHeight,
+		width,
+		height,
+		depth,
+		wallThickness,
+		wallMaterial,
+		doorCenterX,
+		doorwayWidth,
+		doorwayHeight,
+		windowCenterX,
+		windowCenterY,
+		windowWidth,
+		windowHeight,
 	}) {
 		const z = depth / 2;
+
 		const doorLeft = doorCenterX - doorwayWidth / 2;
 		const doorRight = doorCenterX + doorwayWidth / 2;
+
 		const windowLeft = windowCenterX - windowWidth / 2;
 		const windowRight = windowCenterX + windowWidth / 2;
 		const windowBottom = windowCenterY - windowHeight / 2;
@@ -134,25 +202,38 @@ export default class Studio {
 		const addPiece = (xMin, xMax, yMin, yMax) => {
 			const pieceWidth = xMax - xMin;
 			const pieceHeight = yMax - yMin;
+
 			if (pieceWidth <= 0.001 || pieceHeight <= 0.001) return;
 
-			const piece = this.createWallBox(pieceWidth, pieceHeight, wallThickness, wallMaterial, {
-				uOffset: (xMin + width / 2) * this.wallTilesPerUnit,
-				vOffset: yMin * this.wallTilesPerUnit,
-			});
-			piece.position.set((xMin + xMax) / 2, (yMin + yMax) / 2, z);
+			const piece = this.createBox(pieceWidth, pieceHeight, wallThickness, wallMaterial);
+			piece.position.set(
+				(xMin + xMax) / 2,
+				(yMin + yMax) / 2,
+				z
+			);
 			this.group.add(piece);
 		};
 
 		addPiece(-width / 2, windowLeft, 0, height);
 		addPiece(windowRight, doorLeft, 0, height);
 		addPiece(doorRight, width / 2, 0, height);
+
 		addPiece(windowLeft, windowRight, 0, windowBottom);
 		addPiece(windowLeft, windowRight, windowTop, height);
+
 		addPiece(doorLeft, doorRight, doorwayHeight, height);
 	}
 
-	addOpenWindow({ x, y, z, w, h, wallThickness, frameMaterial, trimMaterial }) {
+	addOpenWindow({
+		x,
+		y,
+		z,
+		w,
+		h,
+		wallThickness,
+		frameMaterial,
+		trimMaterial,
+	}) {
 		const outerFrameDepth = 0.10;
 		const innerFrameDepth = 0.08;
 
@@ -201,112 +282,111 @@ export default class Studio {
 		const leftPivot = new THREE.Group();
 		leftPivot.position.set(x - w / 2 - hingeInset, y, shutterZ);
 		this.group.add(leftPivot);
-		const leftShutter = this.createBox(shutterWidth, shutterHeight, shutterThickness, trimMaterial);
+
+		const leftShutter = this.createBox(
+			shutterWidth,
+			shutterHeight,
+			shutterThickness,
+			trimMaterial
+		);
 		leftShutter.position.set(-shutterWidth / 2, 0, 0);
 		leftPivot.add(leftShutter);
+
 		leftPivot.rotation.y = -Math.PI * 0.42;
 
 		const rightPivot = new THREE.Group();
 		rightPivot.position.set(x + w / 2 + hingeInset, y, shutterZ);
 		this.group.add(rightPivot);
-		const rightShutter = this.createBox(shutterWidth, shutterHeight, shutterThickness, trimMaterial);
+
+		const rightShutter = this.createBox(
+			shutterWidth,
+			shutterHeight,
+			shutterThickness,
+			trimMaterial
+		);
 		rightShutter.position.set(shutterWidth / 2, 0, 0);
 		rightPivot.add(rightShutter);
+
 		rightPivot.rotation.y = Math.PI * 0.42;
 	}
 
-	addDesk(width, depth, height, {
-		deskWidth = width * 0.62,
-		deskDepth = 0.9,
-		deskHeight = 0.95,
-		topThickness = 0.08,
-		legThickness = 0.1,
-		backInset = 0.35,
-	} = {}) {
-		const deskMat = new THREE.MeshStandardMaterial({
-			color: 0x6b4f33, roughness: 0.85, metalness: 0,
-		});
-
-		const zCenter = -depth / 2 + backInset + deskDepth / 2;
-
-		const top = this.createBox(deskWidth, topThickness, deskDepth, deskMat);
-		top.position.set(0, deskHeight, zCenter);
-		this.group.add(top);
-
-		const legH = deskHeight - topThickness;
-		const halfW = deskWidth / 2 - legThickness;
-		const halfD = deskDepth / 2 - legThickness;
-
-		const legPositions = [
-			[-halfW, -halfD], [halfW, -halfD],
-			[-halfW, halfD], [halfW, halfD],
-		];
-
-		for (const [lx, lz] of legPositions) {
-			const leg = this.createBox(legThickness, legH, legThickness, deskMat);
-			leg.position.set(lx, legH / 2, zCenter + lz);
-			this.group.add(leg);
-		}
-
-		this.deskSurface = {
-			y: deskHeight + topThickness / 2,
-			z: zCenter,
-			width: deskWidth,
-			depth: deskDepth,
-			center: new THREE.Vector3(0, deskHeight + topThickness / 2, zCenter),
-		};
-
-		return this.deskSurface;
-	}
-
-	placeOnDesk(object, offsetX = 0, offsetZ = 0, yNudge = 0) {
-		if (!this.deskSurface) return;
-		object.position.set(
-			this.deskSurface.center.x + offsetX,
-			this.deskSurface.y + yNudge,
-			this.deskSurface.center.z + offsetZ
-		);
-		this.group.add(object);
-	}
-
-	loadTexture(path, srgb = false) {
+	// OPTIMIZED: mipmaps on, low anisotropy, no extra cost
+	loadTexture(path, repeatX, repeatY, color = false) {
 		const texture = this.textureLoader.load(path);
 		texture.wrapS = THREE.RepeatWrapping;
 		texture.wrapT = THREE.RepeatWrapping;
-		texture.repeat.set(1, 1);
-		texture.anisotropy = 8;
-		if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+		texture.repeat.set(repeatX, repeatY);
+		texture.anisotropy = 2;
+		texture.generateMipmaps = true;
+		texture.minFilter = THREE.LinearMipmapLinearFilter;
+
+		if (color) {
+			texture.colorSpace = THREE.SRGBColorSpace;
+		}
+
 		return texture;
 	}
 
-	createWallMaterial(texturePath) {
-		const map = this.loadTexture(`${texturePath}wood_planks_12_color_4k.png`, true);
-		const normalMap = this.loadTexture(`${texturePath}wood_planks_12_normal_gl_4k.png`);
-		const roughnessMap = this.loadTexture(`${texturePath}wood_planks_12_roughness_4k.png`);
-		const aoMap = this.loadTexture(`${texturePath}wood_planks_12_ambient_occlusion_4k.png`);
+	// OPTIMIZED: dropped aoMap + bumpMap (redundant with normalMap) -> 3 textures instead of 5
+	createWallMaterial(texturePath, repeatX, repeatY) {
+		const map = this.loadTexture(
+			`${texturePath}wood_planks_12_color_4k.png`,
+			repeatX,
+			repeatY,
+			true
+		);
+
+		const normalMap = this.loadTexture(
+			`${texturePath}wood_planks_12_normal_gl_4k.png`,
+			repeatX,
+			repeatY
+		);
+
+		const roughnessMap = this.loadTexture(
+			`${texturePath}wood_planks_12_roughness_4k.png`,
+			repeatX,
+			repeatY
+		);
 
 		return new THREE.MeshStandardMaterial({
-			map, normalMap, roughnessMap, aoMap,
+			map,
+			normalMap,
+			roughnessMap,
 			color: 0xffffff,
-			aoMapIntensity: 0.5,
 			normalScale: new THREE.Vector2(0.4, 0.4),
-			roughness: 0.9,
+			roughness: 0.95,
 			metalness: 0,
 		});
 	}
 
-	createRoofMaterial(texturePath) {
-		const map = this.loadTexture(`${texturePath}wooden_roof_tiles_08_basecolor_4k.png`, true);
-		const normalMap = this.loadTexture(`${texturePath}wooden_roof_tiles_08_normal_gl_4k.png`);
-		const roughnessMap = this.loadTexture(`${texturePath}wooden_roof_tiles_08_roughness_4k.png`);
-		const aoMap = this.loadTexture(`${texturePath}wooden_roof_tiles_08_ambientocclusion_4k.png`);
+	// OPTIMIZED: dropped aoMap + bumpMap -> 3 textures instead of 5
+	createRoofMaterial(texturePath, repeatX, repeatY) {
+		const map = this.loadTexture(
+			`${texturePath}wooden_roof_tiles_08_basecolor_4k.png`,
+			repeatX,
+			repeatY,
+			true
+		);
+
+		const normalMap = this.loadTexture(
+			`${texturePath}wooden_roof_tiles_08_normal_gl_4k.png`,
+			repeatX,
+			repeatY
+		);
+
+		const roughnessMap = this.loadTexture(
+			`${texturePath}wooden_roof_tiles_08_roughness_4k.png`,
+			repeatX,
+			repeatY
+		);
 
 		return new THREE.MeshStandardMaterial({
-			map, normalMap, roughnessMap, aoMap,
+			map,
+			normalMap,
+			roughnessMap,
 			color: 0xffffff,
-			aoMapIntensity: 0.5,
-			normalScale: new THREE.Vector2(0.6, 0.6),
-			roughness: 0.95,
+			normalScale: new THREE.Vector2(0.55, 0.55),
+			roughness: 0.96,
 			metalness: 0,
 			side: THREE.FrontSide,
 		});
@@ -314,40 +394,10 @@ export default class Studio {
 
 	createBox(width, height, depth, material) {
 		const geometry = new THREE.BoxGeometry(width, height, depth);
-		geometry.setAttribute('uv2', new THREE.BufferAttribute(geometry.attributes.uv.array, 2));
-		const mesh = new THREE.Mesh(geometry, material);
-		mesh.castShadow = true;
-		mesh.receiveShadow = true;
-		return mesh;
-	}
-
-	createWallBox(width, height, depth, material, { uOffset = 0, vOffset = 0 } = {}) {
-		const geometry = new THREE.BoxGeometry(width, height, depth);
-		const uv = geometry.attributes.uv;
-		const tpu = this.wallTilesPerUnit;
-
-		const faceDims = [
-			[depth, height], [depth, height],
-			[width, depth], [width, depth],
-			[width, height], [width, height],
-		];
-
-		for (let face = 0; face < 6; face++) {
-			const [fw, fh] = faceDims[face];
-			const repU = fw * tpu;
-			const repV = fh * tpu;
-			const isWallPlane = face === 4 || face === 5;
-			const oU = isWallPlane ? uOffset : 0;
-			const oV = isWallPlane ? vOffset : 0;
-
-			for (let i = 0; i < 4; i++) {
-				const idx = face * 4 + i;
-				uv.setXY(idx, uv.getX(idx) * repU + oU, uv.getY(idx) * repV + oV);
-			}
-		}
-
-		uv.needsUpdate = true;
-		geometry.setAttribute('uv2', new THREE.BufferAttribute(uv.array, 2));
+		geometry.setAttribute(
+			'uv2',
+			new THREE.BufferAttribute(geometry.attributes.uv.array, 2)
+		);
 
 		const mesh = new THREE.Mesh(geometry, material);
 		mesh.castShadow = true;
@@ -356,21 +406,23 @@ export default class Studio {
 	}
 
 	addCornerTrim(width, depth, height, material) {
-		const s = 0.16;
-		const off = 0.09;
+		const s = 0.14;
 
-		const positions = [
-			[-width / 2 - off, depth / 2 + off],
-			[width / 2 + off, depth / 2 + off],
-			[-width / 2 - off, -depth / 2 - off],
-			[width / 2 + off, -depth / 2 - off],
-		];
+		const a = this.createBox(s, height, s, material);
+		a.position.set(-width / 2 - 0.02, height / 2, depth / 2 + 0.02);
+		this.group.add(a);
 
-		for (const [px, pz] of positions) {
-			const post = this.createBox(s, height, s, material);
-			post.position.set(px, height / 2, pz);
-			this.group.add(post);
-		}
+		const b = this.createBox(s, height, s, material);
+		b.position.set(width / 2 + 0.02, height / 2, depth / 2 + 0.02);
+		this.group.add(b);
+
+		const c = this.createBox(s, height, s, material);
+		c.position.set(-width / 2 - 0.02, height / 2, -depth / 2 - 0.02);
+		this.group.add(c);
+
+		const d = this.createBox(s, height, s, material);
+		d.position.set(width / 2 + 0.02, height / 2, -depth / 2 - 0.02);
+		this.group.add(d);
 	}
 
 	addRoofEdgeTrim(width, depth, height, material) {
@@ -406,29 +458,41 @@ export default class Studio {
 		const vertices = [];
 		const uvs = [];
 
-		const su = (width + overhang * 2) * this.roofTilesPerUnit;
-		const sv = (depth + overhang * 2) * this.roofTilesPerUnit;
-
 		const pushTri = (a, b, c, ua, ub, uc) => {
-			vertices.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+			vertices.push(
+				a.x, a.y, a.z,
+				b.x, b.y, b.z,
+				c.x, c.y, c.z
+			);
 			uvs.push(
-				ua[0] * su, ua[1] * sv,
-				ub[0] * su, ub[1] * sv,
-				uc[0] * su, uc[1] * sv
+				ua[0], ua[1],
+				ub[0], ub[1],
+				uc[0], uc[1]
 			);
 		};
 
 		pushTri(fl, fr, topB, [0, 0], [1, 0], [0.75, 1]);
 		pushTri(fl, topB, topA, [0, 0], [0.75, 1], [0.25, 1]);
+
 		pushTri(bl, topA, topB, [0, 0], [0.25, 1], [0.75, 1]);
 		pushTri(bl, topB, br, [0, 0], [0.75, 1], [1, 0]);
+
 		pushTri(fl, topA, bl, [0, 0], [0.5, 1], [1, 0]);
 		pushTri(fr, br, topB, [0, 0], [1, 0], [0.5, 1]);
 
 		const geometry = new THREE.BufferGeometry();
-		geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-		geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
-		geometry.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+		geometry.setAttribute(
+			'position',
+			new THREE.BufferAttribute(new Float32Array(vertices), 3)
+		);
+		geometry.setAttribute(
+			'uv',
+			new THREE.BufferAttribute(new Float32Array(uvs), 2)
+		);
+		geometry.setAttribute(
+			'uv2',
+			new THREE.BufferAttribute(new Float32Array(uvs), 2)
+		);
 		geometry.computeVertexNormals();
 
 		return geometry;
@@ -436,6 +500,7 @@ export default class Studio {
 
 	createHipRoofAssembly(width, depth, rise, overhang, outerMaterial, innerMaterial) {
 		const group = new THREE.Group();
+
 		const geometry = this.buildHipRoofGeometry(width, depth, rise, overhang);
 
 		const outerRoof = new THREE.Mesh(geometry, outerMaterial);
@@ -444,8 +509,8 @@ export default class Studio {
 		group.add(outerRoof);
 
 		const innerRoof = new THREE.Mesh(geometry.clone(), innerMaterial);
-		innerRoof.position.y = -0.05;
-		innerRoof.scale.set(0.975, 1, 0.975);
+		innerRoof.position.y = -0.035;
+		innerRoof.scale.set(0.985, 1, 0.985);
 		innerRoof.castShadow = true;
 		innerRoof.receiveShadow = true;
 		group.add(innerRoof);

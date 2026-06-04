@@ -507,7 +507,7 @@ function main() {
 		scaleMin = 0.75,
 		scaleMax = 1.2,
 		opacity = 0.72,
-		shadowChance = 0.35,
+		shadowChance = 0.0,
 	} = {}) {
 		return new Promise((resolve) => {
 			const mtlLoader = new MTLLoader();
