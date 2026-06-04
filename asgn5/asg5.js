@@ -151,7 +151,7 @@ function main() {
 		grassMinSpacing: 0.12,
 
 		// grass shadows ON
-		grassCastShadow: false,
+		grassCastShadow: true,
 		grassReceiveShadow: true,
 
 		autoGenerateGrass: true,
@@ -181,7 +181,7 @@ function main() {
 
 		// updated shadow settings for crisp, stable grass shadows
 		enableShadows: true,
-		shadowSize: 2048,          // power of two
+		shadowSize: 4098,          // power of two
 		shadowCameraSize: 18,      // covers the radius-16 island
 		shadowFollowCamera: true,  // keeps shadows dense where you look
 
