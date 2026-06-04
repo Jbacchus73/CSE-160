@@ -33,6 +33,7 @@ export default class Island {
 		grassChunkSize = 4.5,
 		grassCullMaxDistance = 20,
 		grassCullExtraMargin = 1.05,
+		grassForwardDotLimit = 0.35,
 		grassCullingDebug = false,
 
 		autoGenerateGrass = false,
@@ -64,6 +65,7 @@ export default class Island {
 		this.grassChunkSize = grassChunkSize;
 		this.grassCullMaxDistance = grassCullMaxDistance;
 		this.grassCullExtraMargin = grassCullExtraMargin;
+		this.grassForwardDotLimit = grassForwardDotLimit;
 		this.grassCullingDebug = grassCullingDebug;
 
 		this.grassBlockers = [];
@@ -72,9 +74,14 @@ export default class Island {
 		this.grassGenerated = false;
 		this.grassLoading = false;
 
+		this.lastGrassVisibleChunks = 0;
+		this.lastGrassTotalChunks = 0;
+
 		this._grassFrustum = new THREE.Frustum();
 		this._grassFrustumMatrix = new THREE.Matrix4();
 		this._grassSphere = new THREE.Sphere();
+		this._grassForward = new THREE.Vector3();
+		this._grassToChunk = new THREE.Vector3();
 
 		const topGeo = this._makeIslandTopGeometry(radius, height, segments);
 
@@ -153,8 +160,21 @@ export default class Island {
 		if (!this.grassGroup || this.grassChunks.length === 0) return;
 
 		camera.updateMatrixWorld();
-		this._grassFrustumMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+
+		this._grassFrustumMatrix.multiplyMatrices(
+			camera.projectionMatrix,
+			camera.matrixWorldInverse
+		);
 		this._grassFrustum.setFromProjectionMatrix(this._grassFrustumMatrix);
+
+		camera.getWorldDirection(this._grassForward);
+		this._grassForward.y = 0;
+
+		if (this._grassForward.lengthSq() > 0.0001) {
+			this._grassForward.normalize();
+		} else {
+			this._grassForward.set(0, 0, -1);
+		}
 
 		let visibleCount = 0;
 		const maxDistanceSq = this.grassCullMaxDistance * this.grassCullMaxDistance;
@@ -165,6 +185,20 @@ export default class Island {
 			if (distanceSq > maxDistanceSq) {
 				chunk.group.visible = false;
 				continue;
+			}
+
+			this._grassToChunk.subVectors(chunk.center, camera.position);
+			this._grassToChunk.y = 0;
+
+			if (this._grassToChunk.lengthSq() > 0.0001) {
+				this._grassToChunk.normalize();
+
+				const dot = this._grassForward.dot(this._grassToChunk);
+
+				if (dot < this.grassForwardDotLimit) {
+					chunk.group.visible = false;
+					continue;
+				}
 			}
 
 			this._grassSphere.center.copy(chunk.center);
@@ -179,7 +213,12 @@ export default class Island {
 		this.lastGrassTotalChunks = this.grassChunks.length;
 
 		if (this.grassCullingDebug) {
-			console.log('visible grass chunks:', visibleCount, '/', this.grassChunks.length);
+			console.log(
+				'visible grass chunks:',
+				visibleCount,
+				'/',
+				this.grassChunks.length
+			);
 		}
 	}
 
@@ -195,6 +234,8 @@ export default class Island {
 			this.grassChunks = [];
 			this.grassGenerated = false;
 			this.grassLoading = false;
+			this.lastGrassVisibleChunks = 0;
+			this.lastGrassTotalChunks = 0;
 			return;
 		}
 
@@ -215,6 +256,8 @@ export default class Island {
 		this.grassChunks = [];
 		this.grassGenerated = false;
 		this.grassLoading = false;
+		this.lastGrassVisibleChunks = 0;
+		this.lastGrassTotalChunks = 0;
 	}
 
 	_makeIslandTopGeometry(radius, height, segments) {
@@ -364,9 +407,12 @@ export default class Island {
 				this.grassLoading = false;
 
 				console.log(
-					'Grass placed:', transforms.length,
-					'| chunks:', this.grassChunks.length,
-					'| source geometries:', sourceGeometries.length
+					'Grass placed:',
+					transforms.length,
+					'| chunks:',
+					this.grassChunks.length,
+					'| source geometries:',
+					sourceGeometries.length
 				);
 			},
 			undefined,
