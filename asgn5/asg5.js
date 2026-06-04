@@ -115,7 +115,7 @@ function main() {
 	renderer.toneMapping = THREE.ACESFilmicToneMapping;
 	renderer.toneMappingExposure = 1.2;
 	renderer.shadowMap.enabled = true;
-	renderer.shadowMap.type = THREE.BasicShadowMap;
+	renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
 	const stats = new Stats();
 	stats.showPanel(0);
@@ -152,6 +152,7 @@ function main() {
 	window.addEventListener('keydown', startAmbientAudio);
 
 	let activeControls = 'walk';
+	let renderInfoTimer = 0;
 
 	const switchButton = document.querySelector('#switchControls');
 
@@ -193,7 +194,63 @@ function main() {
 	const cullingFrustum = new THREE.Frustum();
 	const cullingMatrix = new THREE.Matrix4();
 	const cullingSphere = new THREE.Sphere();
-	const DEBUG_CULLING = true;
+
+	function getGeometryTriangleCount(geometry) {
+		if (!geometry) return 0;
+
+		if (geometry.index) {
+			return Math.floor(geometry.index.count / 3);
+		}
+
+		if (geometry.attributes && geometry.attributes.position) {
+			return Math.floor(geometry.attributes.position.count / 3);
+		}
+
+		return 0;
+	}
+
+	function logTriangleCounts(scene) {
+		const rows = [];
+
+		scene.traverse((object) => {
+			if (!object.isMesh && !object.isInstancedMesh) return;
+			if (!object.geometry) return;
+
+			const baseTriangles = getGeometryTriangleCount(object.geometry);
+			const instances = object.isInstancedMesh ? object.count : 1;
+			const triangles = baseTriangles * instances;
+
+			let materialName = 'none';
+
+			if (Array.isArray(object.material)) {
+				materialName = object.material
+					.map((mat) => mat?.name || mat?.type || 'mat')
+					.join(', ');
+			} else if (object.material) {
+				materialName = object.material.name || object.material.type || 'material';
+			}
+
+			rows.push({
+				name: object.name || object.parent?.name || object.type,
+				type: object.type,
+				triangles,
+				baseTriangles,
+				instances,
+				visible: object.visible,
+				material: materialName,
+			});
+		});
+
+		rows.sort((a, b) => b.triangles - a.triangles);
+
+		console.log('--- TOP TRIANGLE SOURCES ---');
+		console.table(rows.slice(0, 25));
+
+		const total = rows.reduce((sum, row) => sum + row.triangles, 0);
+		console.log('Total counted scene triangles:', total);
+	}
+
+	window.logTriangleCounts = () => logTriangleCounts(scene);
 
 	function addCullable(object, {
 		maxDistance = 60,
@@ -226,14 +283,18 @@ function main() {
 
 			if (distanceSq > maxDistanceSq) {
 				item.object.visible = false;
-			} else {
-				cullingSphere.center.copy(item.center);
-				cullingSphere.radius = item.radius;
-				item.object.visible = cullingFrustum.intersectsSphere(cullingSphere);
+				continue;
 			}
+
+			cullingSphere.center.copy(item.center);
+			cullingSphere.radius = item.radius;
+
+			item.object.visible = cullingFrustum.intersectsSphere(cullingSphere);
 
 			if (item.object.visible) visibleCount++;
 		}
+
+		const DEBUG_CULLING = false;
 
 		if (DEBUG_CULLING) {
 			let grassText = '';
@@ -273,8 +334,8 @@ function main() {
 		const closestX = THREE.MathUtils.clamp(point.x, rect.minX, rect.maxX);
 		const closestZ = THREE.MathUtils.clamp(point.z, rect.minZ, rect.maxZ);
 
-		const dx = point.x - closestX;
-		const dz = point.z - closestZ;
+		let dx = point.x - closestX;
+		let dz = point.z - closestZ;
 		const distSq = dx * dx + dz * dz;
 
 		if (distSq > 0 && distSq < radius * radius) {
@@ -395,12 +456,12 @@ function main() {
 		groundColor: 0x3d6b27,
 		grassObjPath: 'obj/high_grass.obj',
 
-		grassClusterCount: 960,
+		grassClusterCount: 1920,
 		grassTuftsPerClusterMin: 2,
 		grassTuftsPerClusterMax: 4,
 		grassClusterRadiusMin: 0.18,
 		grassClusterRadiusMax: 1.25,
-		grassIsolatedTufts: 480,
+		grassIsolatedTufts: 1060,
 
 		grassEdgeMargin: 0.15,
 		grassClearCenterRadius: 0,
@@ -414,7 +475,14 @@ function main() {
 		grassCastShadow: true,
 		grassReceiveShadow: true,
 
-		autoGenerateGrass: true,
+		grassChunkSize: 4.5,
+		grassCullMaxDistance: 20,
+		grassCullExtraMargin: 1.05,
+		grassForwardDotLimit: 0.35,
+		grassSimplifyRatio: 0.9,
+		grassCullingDebug: false,
+
+		autoGenerateGrass: false,
 	});
 
 	camera.position.set(0, island.surfaceY + 1.7, 8);
@@ -479,7 +547,7 @@ function main() {
 		ambientNightIntensity: 0.18,
 
 		enableShadows: true,
-		shadowSize: 2048,
+		shadowSize: 2056,
 		shadowCameraSize: 18,
 		shadowFollowCamera: true,
 
@@ -818,7 +886,7 @@ function main() {
 			treeCount: 8,
 			minRadius: 3.5,
 			maxRadius: 14.6,
-			scaleMin: 0.9,
+			scaleMin: 0.85,
 			scaleMax: 1.2,
 			blockerRadius: 1.45,
 			minTreeSpacing: 4.5,
@@ -827,6 +895,10 @@ function main() {
 		if (typeof island.generateGrass === 'function') {
 			island.generateGrass(true);
 		}
+
+		setTimeout(() => {
+			logTriangleCounts(scene);
+		}, 4500);
 	});
 
 	const gui = new GUI();
@@ -884,6 +956,8 @@ function main() {
 
 		const delta = clock.getDelta();
 
+		renderInfoTimer += delta;
+
 		ambient.update(delta);
 		dayNight.update(delta, camera);
 
@@ -897,13 +971,24 @@ function main() {
 			walkControls.update(delta);
 		}
 
-		updateCulling(camera);
-
 		if (typeof island.updateGrassCulling === 'function') {
 			island.updateGrassCulling(camera);
 		}
 
+		updateCulling(camera);
+
 		renderer.render(scene, camera);
+
+		if (renderInfoTimer > 1) {
+			console.log(
+				'calls:', renderer.info.render.calls,
+				'triangles:', renderer.info.render.triangles,
+				'geometries:', renderer.info.memory.geometries,
+				'textures:', renderer.info.memory.textures
+			);
+
+			renderInfoTimer = 0;
+		}
 
 		stats.end();
 

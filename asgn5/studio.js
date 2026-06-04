@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export default class Studio {
 	constructor(scene, {
@@ -16,8 +17,6 @@ export default class Studio {
 		wallTexturePath = 'obj/textures/woodPlanks/',
 		roofTexturePath = 'obj/textures/WoodRoof/',
 
-		// tiles-per-world-unit: UVs scale to each piece's real size so planks
-		// are the SAME size on every wall and line up across openings.
 		wallTilesPerUnit = 0.42,
 		roofTilesPerUnit = 0.55,
 	} = {}) {
@@ -26,6 +25,8 @@ export default class Studio {
 
 		this.wallTilesPerUnit = wallTilesPerUnit;
 		this.roofTilesPerUnit = roofTilesPerUnit;
+
+		this._mergeBatches = [];
 
 		const wallMaterial = this.createWallMaterial(wallTexturePath);
 		const roofMaterial = this.createRoofMaterial(roofTexturePath);
@@ -61,6 +62,12 @@ export default class Studio {
 			metalness: 0,
 		});
 
+		const deskMaterial = new THREE.MeshStandardMaterial({
+			color: 0x6b4f33,
+			roughness: 0.85,
+			metalness: 0,
+		});
+
 		const wallThickness = 0.18;
 
 		const doorwayWidth = width * 0.16;
@@ -72,22 +79,21 @@ export default class Studio {
 		const windowCenterX = -width * 0.23;
 		const windowCenterY = height * 0.57;
 
-		const floor = this.createBox(width, 0.14, depth, floorMaterial);
-		floor.position.set(0, 0.07, 0);
-		this.group.add(floor);
+		this.queueBox(width, 0.14, depth, floorMaterial, {
+			position: new THREE.Vector3(0, 0.07, 0),
+		});
 
-		// solid walls use world-scaled UVs (uniform planks)
-		const backWall = this.createWallBox(width, height, wallThickness, wallMaterial);
-		backWall.position.set(0, height / 2, -depth / 2);
-		this.group.add(backWall);
+		this.queueWallBox(width, height, wallThickness, wallMaterial, {
+			position: new THREE.Vector3(0, height / 2, -depth / 2),
+		});
 
-		const leftWall = this.createWallBox(wallThickness, height, depth, wallMaterial);
-		leftWall.position.set(-width / 2, height / 2, 0);
-		this.group.add(leftWall);
+		this.queueWallBox(wallThickness, height, depth, wallMaterial, {
+			position: new THREE.Vector3(-width / 2, height / 2, 0),
+		});
 
-		const rightWall = this.createWallBox(wallThickness, height, depth, wallMaterial);
-		rightWall.position.set(width / 2, height / 2, 0);
-		this.group.add(rightWall);
+		this.queueWallBox(wallThickness, height, depth, wallMaterial, {
+			position: new THREE.Vector3(width / 2, height / 2, 0),
+		});
 
 		this.addFrontWallWithOpenings({
 			width,
@@ -104,23 +110,22 @@ export default class Studio {
 			windowHeight,
 		});
 
-		const leftDoorFrame = this.createBox(0.16, doorwayHeight, 0.26, frameMaterial);
-		leftDoorFrame.position.set(doorCenterX - doorwayWidth / 2, doorwayHeight / 2, depth / 2 + 0.05);
-		this.group.add(leftDoorFrame);
+		this.queueBox(0.16, doorwayHeight, 0.26, frameMaterial, {
+			position: new THREE.Vector3(doorCenterX - doorwayWidth / 2, doorwayHeight / 2, depth / 2 + 0.05),
+		});
 
-		const rightDoorFrame = this.createBox(0.16, doorwayHeight, 0.26, frameMaterial);
-		rightDoorFrame.position.set(doorCenterX + doorwayWidth / 2, doorwayHeight / 2, depth / 2 + 0.05);
-		this.group.add(rightDoorFrame);
+		this.queueBox(0.16, doorwayHeight, 0.26, frameMaterial, {
+			position: new THREE.Vector3(doorCenterX + doorwayWidth / 2, doorwayHeight / 2, depth / 2 + 0.05),
+		});
 
-		const topDoorFrame = this.createBox(doorwayWidth + 0.14, 0.16, 0.26, frameMaterial);
-		topDoorFrame.position.set(doorCenterX, doorwayHeight, depth / 2 + 0.05);
-		this.group.add(topDoorFrame);
+		this.queueBox(doorwayWidth + 0.14, 0.16, 0.26, frameMaterial, {
+			position: new THREE.Vector3(doorCenterX, doorwayHeight, depth / 2 + 0.05),
+		});
 
-		const doorStep = this.createBox(doorwayWidth + 0.75, 0.12, 0.58, trimMaterial);
-		doorStep.position.set(doorCenterX, 0.06, depth / 2 + 0.42);
-		this.group.add(doorStep);
+		this.queueBox(doorwayWidth + 0.75, 0.12, 0.58, trimMaterial, {
+			position: new THREE.Vector3(doorCenterX, 0.06, depth / 2 + 0.42),
+		});
 
-		// porch lights flanking the door
 		this.addPorchLights({
 			doorCenterX,
 			doorwayWidth,
@@ -142,9 +147,9 @@ export default class Studio {
 		this.addCornerTrim(width, depth, height, trimMaterial);
 		this.addRoofEdgeTrim(width, depth, height, trimMaterial);
 
-		const ceiling = this.createBox(width - 0.1, 0.08, depth - 0.1, interiorCeilingMaterial);
-		ceiling.position.set(0, height - 0.04, 0);
-		this.group.add(ceiling);
+		this.queueBox(width - 0.1, 0.08, depth - 0.1, interiorCeilingMaterial, {
+			position: new THREE.Vector3(0, height - 0.04, 0),
+		});
 
 		const roof = this.createHipRoofAssembly(width, depth, 1.8, 0.6, roofMaterial, roofUnderMaterial);
 		roof.position.y = height + 0.04;
@@ -154,10 +159,12 @@ export default class Studio {
 		chimney.position.set(0.05, height + 1.0, -depth * 0.08);
 		this.group.add(chimney);
 
-		// desk against the back wall
-		this.addDesk(width, depth, height);
+		this.addDesk(width, depth, height, {
+			deskMaterial,
+		});
 
-		// two speakers on the desk (loads async; pops in when ready)
+		this.flushMergedMeshes();
+
 		this.addSpeakers();
 
 		this.group.position.set(x, y, z);
@@ -166,7 +173,106 @@ export default class Studio {
 		scene.add(this.group);
 	}
 
-	// desk built from primitives, against the back wall
+	_findBatch(material) {
+		let batch = this._mergeBatches.find((entry) => entry.material === material);
+
+		if (!batch) {
+			batch = {
+				material,
+				geometries: [],
+			};
+			this._mergeBatches.push(batch);
+		}
+
+		return batch;
+	}
+
+	queueGeometry(geometry, material, {
+		position = new THREE.Vector3(),
+		rotation = new THREE.Euler(),
+		scale = new THREE.Vector3(1, 1, 1),
+	} = {}) {
+		const matrix = new THREE.Matrix4();
+		const quaternion = new THREE.Quaternion().setFromEuler(rotation);
+		matrix.compose(position, quaternion, scale);
+
+		geometry.applyMatrix4(matrix);
+
+		this._findBatch(material).geometries.push(geometry);
+	}
+
+	queueBox(width, height, depth, material, {
+		position = new THREE.Vector3(),
+		rotation = new THREE.Euler(),
+		scale = new THREE.Vector3(1, 1, 1),
+	} = {}) {
+		const geometry = new THREE.BoxGeometry(width, height, depth);
+
+		if (geometry.attributes.uv) {
+			geometry.setAttribute(
+				'uv2',
+				new THREE.BufferAttribute(new Float32Array(geometry.attributes.uv.array), 2)
+			);
+		}
+
+		this.queueGeometry(geometry, material, {
+			position,
+			rotation,
+			scale,
+		});
+	}
+
+	queueWallBox(width, height, depth, material, {
+		position = new THREE.Vector3(),
+		rotation = new THREE.Euler(),
+		scale = new THREE.Vector3(1, 1, 1),
+		uOffset = 0,
+		vOffset = 0,
+	} = {}) {
+		const geometry = this.createWallBoxGeometry(width, height, depth, {
+			uOffset,
+			vOffset,
+		});
+
+		this.queueGeometry(geometry, material, {
+			position,
+			rotation,
+			scale,
+		});
+	}
+
+	flushMergedMeshes() {
+		for (const batch of this._mergeBatches) {
+			if (batch.geometries.length === 0) continue;
+
+			let geometry;
+
+			if (batch.geometries.length === 1) {
+				geometry = batch.geometries[0];
+			} else {
+				geometry = mergeGeometries(batch.geometries, false);
+				for (const source of batch.geometries) {
+					source.dispose();
+				}
+			}
+
+			if (!geometry) continue;
+
+			geometry.computeBoundingSphere();
+			geometry.computeBoundingBox();
+
+			const mesh = new THREE.Mesh(geometry, batch.material);
+			mesh.castShadow = true;
+			mesh.receiveShadow = true;
+			mesh.matrixAutoUpdate = false;
+			mesh.updateMatrix();
+
+			this.group.add(mesh);
+		}
+
+		this._mergeBatches.length = 0;
+	}
+
 	addDesk(width, depth, height, {
 		deskWidth = width * 0.62,
 		deskDepth = 0.9,
@@ -174,21 +280,18 @@ export default class Studio {
 		topThickness = 0.08,
 		legThickness = 0.1,
 		backInset = 0.35,
-	} = {}) {
-		const deskMat = new THREE.MeshStandardMaterial({
+		deskMaterial = new THREE.MeshStandardMaterial({
 			color: 0x6b4f33,
 			roughness: 0.85,
 			metalness: 0,
-		});
-
+		}),
+	} = {}) {
 		const zCenter = -depth / 2 + backInset + deskDepth / 2;
 
-		// tabletop
-		const top = this.createBox(deskWidth, topThickness, deskDepth, deskMat);
-		top.position.set(0, deskHeight, zCenter);
-		this.group.add(top);
+		this.queueBox(deskWidth, topThickness, deskDepth, deskMaterial, {
+			position: new THREE.Vector3(0, deskHeight, zCenter),
+		});
 
-		// four legs
 		const legH = deskHeight - topThickness;
 		const halfW = deskWidth / 2 - legThickness;
 		const halfD = deskDepth / 2 - legThickness;
@@ -201,12 +304,11 @@ export default class Studio {
 		];
 
 		for (const [lx, lz] of legPositions) {
-			const leg = this.createBox(legThickness, legH, legThickness, deskMat);
-			leg.position.set(lx, legH / 2, zCenter + lz);
-			this.group.add(leg);
+			this.queueBox(legThickness, legH, legThickness, deskMaterial, {
+				position: new THREE.Vector3(lx, legH / 2, zCenter + lz),
+			});
 		}
 
-		// surface info in LOCAL coords (inside the studio group)
 		this.deskSurface = {
 			y: deskHeight + topThickness / 2,
 			z: zCenter,
@@ -218,24 +320,22 @@ export default class Studio {
 		return this.deskSurface;
 	}
 
-	// place a mesh/group on the desk at a local offset from desk center.
-	// objects added this way inherit the studio's position & rotation.
 	placeOnDesk(object, offsetX = 0, offsetZ = 0, yNudge = 0) {
 		if (!this.deskSurface) return;
+
 		object.position.set(
 			this.deskSurface.center.x + offsetX,
 			this.deskSurface.y + yNudge,
 			this.deskSurface.center.z + offsetZ
 		);
+
 		this.group.add(object);
 	}
 
-	// load the speaker OBJ once, clone into two, place on the desk.
-	// async: speakers appear a moment after the studio is built.
 	addSpeakers({
 		objPath = 'obj/speaker.obj',
 		texturePath = 'obj/textures/',
-		scale = 5.0,
+		scale = 2.0,
 		offsetX = 1.7,
 		offsetZ = -0.1,
 	} = {}) {
@@ -263,6 +363,7 @@ export default class Studio {
 		});
 
 		const objLoader = new OBJLoader();
+
 		objLoader.load(
 			objPath,
 			(root) => {
@@ -274,9 +375,9 @@ export default class Studio {
 					}
 				});
 
-				// recenter horizontally + base at local origin so it sits ON the desk
 				const box = new THREE.Box3().setFromObject(root);
 				const center = box.getCenter(new THREE.Vector3());
+
 				root.position.x -= center.x;
 				root.position.z -= center.z;
 				root.position.y -= box.min.y;
@@ -296,22 +397,29 @@ export default class Studio {
 		);
 	}
 
-	// soft round glow texture (radial alpha falloff) for light sprites
 	_makeGlowSprite(color) {
 		if (!this._glowTexture) {
 			const size = 128;
 			const canvas = document.createElement('canvas');
 			canvas.width = canvas.height = size;
+
 			const ctx = canvas.getContext('2d');
 			const g = ctx.createRadialGradient(
-				size / 2, size / 2, 0,
-				size / 2, size / 2, size / 2
+				size / 2,
+				size / 2,
+				0,
+				size / 2,
+				size / 2,
+				size / 2
 			);
+
 			g.addColorStop(0.0, 'rgba(255,255,255,1)');
 			g.addColorStop(0.25, 'rgba(255,255,255,0.7)');
 			g.addColorStop(1.0, 'rgba(255,255,255,0)');
+
 			ctx.fillStyle = g;
 			ctx.fillRect(0, 0, size, size);
+
 			this._glowTexture = new THREE.CanvasTexture(canvas);
 		}
 
@@ -319,27 +427,24 @@ export default class Studio {
 			map: this._glowTexture,
 			color,
 			transparent: true,
-			opacity: 0.85,
+			opacity: 0.35,
 			blending: THREE.AdditiveBlending,
 			depthWrite: false,
 		}));
 	}
 
-	// two wall-mounted lantern fixtures on either side of the door.
-	// each = a dark housing box + a glowing bulb + a real PointLight.
 	addPorchLights({
 		doorCenterX = 0,
 		doorwayWidth = 1,
 		doorwayHeight = 2,
 		depth = 5.8,
-		spread = 0.55,        // how far out from the door edge
-		mountHeight = null,   // defaults to ~80% of door height
+		spread = 0.55,
+		mountHeight = null,
 		bulbColor = 0xffd28a,
-		lightIntensity = 1.4,
-		lightDistance = 14,
+		lightIntensity = 1.6,
+		lightDistance = 6,
 	} = {}) {
-		const z = depth / 2 + 0.12; // just proud of the front wall
-
+		const z = depth / 2 + 0.12;
 		const y = mountHeight !== null ? mountHeight : doorwayHeight * 0.8;
 
 		const leftX = doorCenterX - doorwayWidth / 2 - spread;
@@ -364,67 +469,73 @@ export default class Studio {
 		const makeLantern = (x) => {
 			const lantern = new THREE.Group();
 
-			// back plate against the wall
 			const plate = this.createBox(0.16, 0.22, 0.05, housingMat);
 			plate.position.set(0, 0.02, -0.06);
+			plate.castShadow = false;
+			plate.receiveShadow = false;
 			lantern.add(plate);
 
-			// little arm bracket holding the lantern out from the wall
 			const arm = this.createBox(0.05, 0.05, 0.16, housingMat);
 			arm.position.set(0, 0.1, 0.04);
+			arm.castShadow = false;
+			arm.receiveShadow = false;
 			lantern.add(arm);
 
-			// lantern top cap
 			const cap = this.createBox(0.18, 0.05, 0.18, housingMat);
 			cap.position.set(0, 0.04, 0.14);
+			cap.castShadow = false;
+			cap.receiveShadow = false;
 			lantern.add(cap);
 
-			// open cage: 4 thin vertical posts (bulb shows through the gaps)
 			const postH = 0.18;
 			const postT = 0.025;
 			const cageHalf = 0.07;
+
 			const postPositions = [
 				[-cageHalf, 0.14 - cageHalf],
 				[cageHalf, 0.14 - cageHalf],
 				[-cageHalf, 0.14 + cageHalf],
 				[cageHalf, 0.14 + cageHalf],
 			];
+
 			for (const [px, pz] of postPositions) {
 				const post = this.createBox(postT, postH, postT, housingMat);
 				post.position.set(px, -0.08, pz);
+				post.castShadow = false;
+				post.receiveShadow = false;
 				lantern.add(post);
 			}
 
-			// bottom cap
 			const bottom = this.createBox(0.16, 0.04, 0.16, housingMat);
 			bottom.position.set(0, -0.19, 0.14);
+			bottom.castShadow = false;
+			bottom.receiveShadow = false;
 			lantern.add(bottom);
 
-			// glowing bulb — now visible inside the open cage
 			const bulb = new THREE.Mesh(
 				new THREE.SphereGeometry(0.06, 14, 14),
 				bulbMat
 			);
 			bulb.position.set(0, -0.08, 0.14);
+			bulb.castShadow = false;
+			bulb.receiveShadow = false;
 			lantern.add(bulb);
 
-			// soft glow sprite so the bulb reads as bright even up close
 			const glow = this._makeGlowSprite(bulbColor);
 			glow.scale.set(0.45, 0.45, 1);
 			glow.position.set(0, -0.08, 0.14);
 			lantern.add(glow);
 
-			// actual light source, placed in front so it lights the wall + porch
 			const light = new THREE.PointLight(bulbColor, lightIntensity, lightDistance, 2);
 			light.position.set(0, -0.08, 0.2);
 			light.castShadow = false;
-
 			lantern.add(light);
 
 			lantern.position.set(x, y, z);
 			this.group.add(lantern);
 
 			this.porchLights.push({ group: lantern, light, bulb, glow });
+
 			return lantern;
 		};
 
@@ -432,9 +543,9 @@ export default class Studio {
 		makeLantern(rightX);
 	}
 
-	// optional: toggle porch lights on/off (e.g. at night)
 	setPorchLights(on) {
 		if (!this.porchLights) return;
+
 		for (const { light, bulb, glow } of this.porchLights) {
 			light.visible = on;
 			bulb.material.emissiveIntensity = on ? 1.4 : 0;
@@ -466,20 +577,17 @@ export default class Studio {
 		const windowBottom = windowCenterY - windowHeight / 2;
 		const windowTop = windowCenterY + windowHeight / 2;
 
-		// each piece sits at its true world position, UVs offset so the texture
-		// is continuous across all pieces (planks line up across the openings)
 		const addPiece = (xMin, xMax, yMin, yMax) => {
 			const pieceWidth = xMax - xMin;
 			const pieceHeight = yMax - yMin;
 
 			if (pieceWidth <= 0.001 || pieceHeight <= 0.001) return;
 
-			const piece = this.createWallBox(pieceWidth, pieceHeight, wallThickness, wallMaterial, {
+			this.queueWallBox(pieceWidth, pieceHeight, wallThickness, wallMaterial, {
+				position: new THREE.Vector3((xMin + xMax) / 2, (yMin + yMax) / 2, z),
 				uOffset: (xMin + width / 2) * this.wallTilesPerUnit,
 				vOffset: yMin * this.wallTilesPerUnit,
 			});
-			piece.position.set((xMin + xMax) / 2, (yMin + yMax) / 2, z);
-			this.group.add(piece);
 		};
 
 		addPiece(-width / 2, windowLeft, 0, height);
@@ -505,41 +613,41 @@ export default class Studio {
 		const outerFrameDepth = 0.10;
 		const innerFrameDepth = 0.08;
 
-		const leftFrame = this.createBox(0.08, h + 0.12, outerFrameDepth, frameMaterial);
-		leftFrame.position.set(x - w / 2, y, z + 0.03);
-		this.group.add(leftFrame);
+		this.queueBox(0.08, h + 0.12, outerFrameDepth, frameMaterial, {
+			position: new THREE.Vector3(x - w / 2, y, z + 0.03),
+		});
 
-		const rightFrame = this.createBox(0.08, h + 0.12, outerFrameDepth, frameMaterial);
-		rightFrame.position.set(x + w / 2, y, z + 0.03);
-		this.group.add(rightFrame);
+		this.queueBox(0.08, h + 0.12, outerFrameDepth, frameMaterial, {
+			position: new THREE.Vector3(x + w / 2, y, z + 0.03),
+		});
 
-		const topFrame = this.createBox(w + 0.08, 0.08, outerFrameDepth, frameMaterial);
-		topFrame.position.set(x, y + h / 2, z + 0.03);
-		this.group.add(topFrame);
+		this.queueBox(w + 0.08, 0.08, outerFrameDepth, frameMaterial, {
+			position: new THREE.Vector3(x, y + h / 2, z + 0.03),
+		});
 
-		const bottomFrame = this.createBox(w + 0.08, 0.08, outerFrameDepth, frameMaterial);
-		bottomFrame.position.set(x, y - h / 2, z + 0.03);
-		this.group.add(bottomFrame);
+		this.queueBox(w + 0.08, 0.08, outerFrameDepth, frameMaterial, {
+			position: new THREE.Vector3(x, y - h / 2, z + 0.03),
+		});
 
-		const innerLeft = this.createBox(0.05, h, innerFrameDepth, trimMaterial);
-		innerLeft.position.set(x - w / 2 + 0.02, y, z - wallThickness / 2 + 0.04);
-		this.group.add(innerLeft);
+		this.queueBox(0.05, h, innerFrameDepth, trimMaterial, {
+			position: new THREE.Vector3(x - w / 2 + 0.02, y, z - wallThickness / 2 + 0.04),
+		});
 
-		const innerRight = this.createBox(0.05, h, innerFrameDepth, trimMaterial);
-		innerRight.position.set(x + w / 2 - 0.02, y, z - wallThickness / 2 + 0.04);
-		this.group.add(innerRight);
+		this.queueBox(0.05, h, innerFrameDepth, trimMaterial, {
+			position: new THREE.Vector3(x + w / 2 - 0.02, y, z - wallThickness / 2 + 0.04),
+		});
 
-		const innerTop = this.createBox(w, 0.05, innerFrameDepth, trimMaterial);
-		innerTop.position.set(x, y + h / 2 - 0.02, z - wallThickness / 2 + 0.04);
-		this.group.add(innerTop);
+		this.queueBox(w, 0.05, innerFrameDepth, trimMaterial, {
+			position: new THREE.Vector3(x, y + h / 2 - 0.02, z - wallThickness / 2 + 0.04),
+		});
 
-		const innerBottom = this.createBox(w, 0.05, innerFrameDepth, trimMaterial);
-		innerBottom.position.set(x, y - h / 2 + 0.02, z - wallThickness / 2 + 0.04);
-		this.group.add(innerBottom);
+		this.queueBox(w, 0.05, innerFrameDepth, trimMaterial, {
+			position: new THREE.Vector3(x, y - h / 2 + 0.02, z - wallThickness / 2 + 0.04),
+		});
 
-		const sill = this.createBox(w + 0.22, 0.06, 0.20, trimMaterial);
-		sill.position.set(x, y - h / 2 - 0.05, z + 0.11);
-		this.group.add(sill);
+		this.queueBox(w + 0.22, 0.06, 0.20, trimMaterial, {
+			position: new THREE.Vector3(x, y - h / 2 - 0.05, z + 0.11),
+		});
 
 		const shutterThickness = 0.035;
 		const shutterWidth = w * 0.42;
@@ -547,39 +655,47 @@ export default class Studio {
 		const shutterZ = z + 0.085;
 		const hingeInset = 0.01;
 
-		const leftPivot = new THREE.Group();
-		leftPivot.position.set(x - w / 2 - hingeInset, y, shutterZ);
-		this.group.add(leftPivot);
+		const leftPivot = new THREE.Vector3(x - w / 2 - hingeInset, y, shutterZ);
+		const rightPivot = new THREE.Vector3(x + w / 2 + hingeInset, y, shutterZ);
 
-		const leftShutter = this.createBox(shutterWidth, shutterHeight, shutterThickness, trimMaterial);
-		leftShutter.position.set(-shutterWidth / 2, 0, 0);
-		leftPivot.add(leftShutter);
-		leftPivot.rotation.y = -Math.PI * 0.42;
+		const leftOffset = new THREE.Vector3(-shutterWidth / 2, 0, 0);
+		const rightOffset = new THREE.Vector3(shutterWidth / 2, 0, 0);
 
-		const rightPivot = new THREE.Group();
-		rightPivot.position.set(x + w / 2 + hingeInset, y, shutterZ);
-		this.group.add(rightPivot);
+		const leftRotation = new THREE.Euler(0, -Math.PI * 0.42, 0);
+		const rightRotation = new THREE.Euler(0, Math.PI * 0.42, 0);
 
-		const rightShutter = this.createBox(shutterWidth, shutterHeight, shutterThickness, trimMaterial);
-		rightShutter.position.set(shutterWidth / 2, 0, 0);
-		rightPivot.add(rightShutter);
-		rightPivot.rotation.y = Math.PI * 0.42;
+		const leftQuaternion = new THREE.Quaternion().setFromEuler(leftRotation);
+		const rightQuaternion = new THREE.Quaternion().setFromEuler(rightRotation);
+
+		leftOffset.applyQuaternion(leftQuaternion);
+		rightOffset.applyQuaternion(rightQuaternion);
+
+		this.queueBox(shutterWidth, shutterHeight, shutterThickness, trimMaterial, {
+			position: leftPivot.clone().add(leftOffset),
+			rotation: leftRotation,
+		});
+
+		this.queueBox(shutterWidth, shutterHeight, shutterThickness, trimMaterial, {
+			position: rightPivot.clone().add(rightOffset),
+			rotation: rightRotation,
+		});
 	}
 
-	// OPTIMIZED: mipmaps on, low anisotropy
 	loadTexture(path, srgb = false) {
 		const texture = this.textureLoader.load(path);
+
 		texture.wrapS = THREE.RepeatWrapping;
 		texture.wrapT = THREE.RepeatWrapping;
-		texture.repeat.set(1, 1); // per-mesh UVs carry the tiling
+		texture.repeat.set(1, 1);
 		texture.anisotropy = 2;
 		texture.generateMipmaps = true;
 		texture.minFilter = THREE.LinearMipmapLinearFilter;
+
 		if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+
 		return texture;
 	}
 
-	// OPTIMIZED: dropped aoMap + bumpMap (redundant with normalMap)
 	createWallMaterial(texturePath) {
 		const map = this.loadTexture(`${texturePath}wood_planks_12_color_4k.png`, true);
 		const normalMap = this.loadTexture(`${texturePath}wood_planks_12_normal_gl_4k.png`);
@@ -613,31 +729,38 @@ export default class Studio {
 		});
 	}
 
-	// plain box: UVs 0..1 per face (trim/frames/floor where continuity doesn't matter)
 	createBox(width, height, depth, material) {
 		const geometry = new THREE.BoxGeometry(width, height, depth);
-		geometry.setAttribute('uv2', new THREE.BufferAttribute(geometry.attributes.uv.array, 2));
+
+		if (geometry.attributes.uv) {
+			geometry.setAttribute(
+				'uv2',
+				new THREE.BufferAttribute(new Float32Array(geometry.attributes.uv.array), 2)
+			);
+		}
+
 		const mesh = new THREE.Mesh(geometry, material);
 		mesh.castShadow = true;
 		mesh.receiveShadow = true;
+
 		return mesh;
 	}
 
-	// wall box: UVs scaled to world size (constant plank density), optional
-	// offset so adjacent pieces share a continuous texture.
-	createWallBox(width, height, depth, material, { uOffset = 0, vOffset = 0 } = {}) {
+	createWallBoxGeometry(width, height, depth, {
+		uOffset = 0,
+		vOffset = 0,
+	} = {}) {
 		const geometry = new THREE.BoxGeometry(width, height, depth);
 		const uv = geometry.attributes.uv;
 		const tpu = this.wallTilesPerUnit;
 
-		// BoxGeometry face order: +X, -X, +Y, -Y, +Z, -Z (4 verts each)
 		const faceDims = [
-			[depth, height], // +X
-			[depth, height], // -X
-			[width, depth],  // +Y
-			[width, depth],  // -Y
-			[width, height], // +Z
-			[width, height], // -Z
+			[depth, height],
+			[depth, height],
+			[width, depth],
+			[width, depth],
+			[width, height],
+			[width, height],
 		];
 
 		for (let face = 0; face < 6; face++) {
@@ -651,20 +774,37 @@ export default class Studio {
 
 			for (let i = 0; i < 4; i++) {
 				const idx = face * 4 + i;
-				uv.setXY(idx, uv.getX(idx) * repU + oU, uv.getY(idx) * repV + oV);
+				uv.setXY(
+					idx,
+					uv.getX(idx) * repU + oU,
+					uv.getY(idx) * repV + oV
+				);
 			}
 		}
 
 		uv.needsUpdate = true;
-		geometry.setAttribute('uv2', new THREE.BufferAttribute(uv.array, 2));
+
+		geometry.setAttribute(
+			'uv2',
+			new THREE.BufferAttribute(new Float32Array(uv.array), 2)
+		);
+
+		return geometry;
+	}
+
+	createWallBox(width, height, depth, material, { uOffset = 0, vOffset = 0 } = {}) {
+		const geometry = this.createWallBoxGeometry(width, height, depth, {
+			uOffset,
+			vOffset,
+		});
 
 		const mesh = new THREE.Mesh(geometry, material);
 		mesh.castShadow = true;
 		mesh.receiveShadow = true;
+
 		return mesh;
 	}
 
-	// corner posts pushed clear of the wall faces (avoids z-fighting)
 	addCornerTrim(width, depth, height, material) {
 		const s = 0.16;
 		const off = 0.09;
@@ -677,28 +817,28 @@ export default class Studio {
 		];
 
 		for (const [px, pz] of positions) {
-			const post = this.createBox(s, height, s, material);
-			post.position.set(px, height / 2, pz);
-			this.group.add(post);
+			this.queueBox(s, height, s, material, {
+				position: new THREE.Vector3(px, height / 2, pz),
+			});
 		}
 	}
 
 	addRoofEdgeTrim(width, depth, height, material) {
-		const front = this.createBox(width + 0.28, 0.12, 0.12, material);
-		front.position.set(0, height + 0.02, depth / 2 + 0.08);
-		this.group.add(front);
+		this.queueBox(width + 0.28, 0.12, 0.12, material, {
+			position: new THREE.Vector3(0, height + 0.02, depth / 2 + 0.08),
+		});
 
-		const back = this.createBox(width + 0.28, 0.12, 0.12, material);
-		back.position.set(0, height + 0.02, -depth / 2 - 0.08);
-		this.group.add(back);
+		this.queueBox(width + 0.28, 0.12, 0.12, material, {
+			position: new THREE.Vector3(0, height + 0.02, -depth / 2 - 0.08),
+		});
 
-		const left = this.createBox(0.12, 0.12, depth + 0.28, material);
-		left.position.set(-width / 2 - 0.08, height + 0.02, 0);
-		this.group.add(left);
+		this.queueBox(0.12, 0.12, depth + 0.28, material, {
+			position: new THREE.Vector3(-width / 2 - 0.08, height + 0.02, 0),
+		});
 
-		const right = this.createBox(0.12, 0.12, depth + 0.28, material);
-		right.position.set(width / 2 + 0.08, height + 0.02, 0);
-		this.group.add(right);
+		this.queueBox(0.12, 0.12, depth + 0.28, material, {
+			position: new THREE.Vector3(width / 2 + 0.08, height + 0.02, 0),
+		});
 	}
 
 	buildHipRoofGeometry(width, depth, rise, overhang) {
@@ -720,7 +860,12 @@ export default class Studio {
 		const sv = (depth + overhang * 2) * this.roofTilesPerUnit;
 
 		const pushTri = (a, b, c, ua, ub, uc) => {
-			vertices.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+			vertices.push(
+				a.x, a.y, a.z,
+				b.x, b.y, b.z,
+				c.x, c.y, c.z
+			);
+
 			uvs.push(
 				ua[0] * su, ua[1] * sv,
 				ub[0] * su, ub[1] * sv,
@@ -736,9 +881,22 @@ export default class Studio {
 		pushTri(fr, br, topB, [0, 0], [1, 0], [0.5, 1]);
 
 		const geometry = new THREE.BufferGeometry();
-		geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-		geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
-		geometry.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+
+		geometry.setAttribute(
+			'position',
+			new THREE.BufferAttribute(new Float32Array(vertices), 3)
+		);
+
+		geometry.setAttribute(
+			'uv',
+			new THREE.BufferAttribute(new Float32Array(uvs), 2)
+		);
+
+		geometry.setAttribute(
+			'uv2',
+			new THREE.BufferAttribute(new Float32Array(uvs), 2)
+		);
+
 		geometry.computeVertexNormals();
 
 		return geometry;

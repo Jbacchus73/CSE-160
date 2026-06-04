@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
 
 export default class Island {
 	constructor(scene, textureLoader, {
@@ -31,10 +32,12 @@ export default class Island {
 		grassReceiveShadow = true,
 
 		grassChunkSize = 4.5,
-		grassCullMaxDistance = 20,
-		grassCullExtraMargin = 1.05,
-		grassForwardDotLimit = 0.35,
+		grassCullMaxDistance = 40,
+		grassCullExtraMargin = 2.5,
+		grassForwardDotLimit = -0.5,
 		grassCullingDebug = false,
+
+		grassSimplifyRatio = 0.95,
 
 		autoGenerateGrass = false,
 	} = {}) {
@@ -67,6 +70,7 @@ export default class Island {
 		this.grassCullExtraMargin = grassCullExtraMargin;
 		this.grassForwardDotLimit = grassForwardDotLimit;
 		this.grassCullingDebug = grassCullingDebug;
+		this.grassSimplifyRatio = grassSimplifyRatio;
 
 		this.grassBlockers = [];
 		this.grassGroup = null;
@@ -82,6 +86,7 @@ export default class Island {
 		this._grassSphere = new THREE.Sphere();
 		this._grassForward = new THREE.Vector3();
 		this._grassToChunk = new THREE.Vector3();
+		this._grassSimplifier = new SimplifyModifier();
 
 		const topGeo = this._makeIslandTopGeometry(radius, height, segments);
 
@@ -213,12 +218,7 @@ export default class Island {
 		this.lastGrassTotalChunks = this.grassChunks.length;
 
 		if (this.grassCullingDebug) {
-			console.log(
-				'visible grass chunks:',
-				visibleCount,
-				'/',
-				this.grassChunks.length
-			);
+			console.log('visible grass chunks:', visibleCount, '/', this.grassChunks.length);
 		}
 	}
 
@@ -239,14 +239,26 @@ export default class Island {
 			return;
 		}
 
+		const disposedGeometries = new Set();
+		const disposedMaterials = new Set();
+
 		this.grassGroup.traverse((child) => {
 			if (child.isInstancedMesh) {
-				child.geometry.dispose();
+				if (child.geometry && !disposedGeometries.has(child.geometry)) {
+					child.geometry.dispose();
+					disposedGeometries.add(child.geometry);
+				}
 
 				if (Array.isArray(child.material)) {
-					child.material.forEach((m) => m.dispose());
-				} else if (child.material) {
+					child.material.forEach((m) => {
+						if (m && !disposedMaterials.has(m)) {
+							m.dispose();
+							disposedMaterials.add(m);
+						}
+					});
+				} else if (child.material && !disposedMaterials.has(child.material)) {
 					child.material.dispose();
+					disposedMaterials.add(child.material);
 				}
 			}
 		});
@@ -295,6 +307,72 @@ export default class Island {
 		return geo;
 	}
 
+	_simplifyGrassGeometry(geometry) {
+		if (!geometry || !geometry.attributes || !geometry.attributes.position) {
+			return geometry;
+		}
+
+		if (!this.grassSimplifyRatio || this.grassSimplifyRatio <= 0) {
+			geometry.computeVertexNormals();
+			geometry.computeBoundingBox();
+			geometry.computeBoundingSphere();
+			return geometry;
+		}
+
+		const originalTriangles = geometry.index
+			? Math.floor(geometry.index.count / 3)
+			: Math.floor(geometry.attributes.position.count / 3);
+
+		const originalVertices = geometry.attributes.position.count;
+
+		const minVertices = 18;
+		const removeCount = Math.min(
+			Math.floor(originalVertices * this.grassSimplifyRatio),
+			Math.max(0, originalVertices - minVertices)
+		);
+
+		if (removeCount <= 0) {
+			geometry.computeVertexNormals();
+			geometry.computeBoundingBox();
+			geometry.computeBoundingSphere();
+			return geometry;
+		}
+
+		try {
+			const simplified = this._grassSimplifier.modify(geometry, removeCount);
+
+			simplified.computeVertexNormals();
+			simplified.computeBoundingBox();
+			simplified.computeBoundingSphere();
+
+			const simplifiedTriangles = simplified.index
+				? Math.floor(simplified.index.count / 3)
+				: Math.floor(simplified.attributes.position.count / 3);
+
+			console.log(
+				'Grass simplified:',
+				originalTriangles,
+				'triangles ->',
+				simplifiedTriangles,
+				'triangles',
+				'| ratio:',
+				this.grassSimplifyRatio
+			);
+
+			geometry.dispose();
+
+			return simplified;
+		} catch (error) {
+			console.warn('Grass simplify failed, using original geometry:', error);
+
+			geometry.computeVertexNormals();
+			geometry.computeBoundingBox();
+			geometry.computeBoundingSphere();
+
+			return geometry;
+		}
+	}
+
 	_loadGrassObjects(grassObjPath) {
 		const objLoader = new OBJLoader();
 
@@ -311,10 +389,12 @@ export default class Island {
 				root.updateMatrixWorld(true);
 
 				const sourceGeometries = [];
+
 				root.traverse((child) => {
 					if (child.isMesh) {
-						const g = child.geometry.clone();
+						let g = child.geometry.clone();
 						g.applyMatrix4(child.matrixWorld);
+						g = this._simplifyGrassGeometry(g);
 						sourceGeometries.push(g);
 					}
 				});
@@ -460,6 +540,13 @@ export default class Island {
 
 		const dummy = new THREE.Object3D();
 
+		const grassMat = new THREE.MeshStandardMaterial({
+			color: 0x5faa3f,
+			roughness: 1,
+			metalness: 0,
+			side: THREE.DoubleSide,
+		});
+
 		for (const chunkData of chunkMap.values()) {
 			const chunkGroup = new THREE.Group();
 			chunkGroup.matrixAutoUpdate = false;
@@ -467,15 +554,8 @@ export default class Island {
 
 			const count = chunkData.transforms.length;
 
-			const grassMat = new THREE.MeshStandardMaterial({
-				color: 0x5faa3f,
-				roughness: 1,
-				metalness: 0,
-				side: THREE.DoubleSide,
-			});
-
 			for (const geo of sourceGeometries) {
-				const inst = new THREE.InstancedMesh(geo.clone(), grassMat.clone(), count);
+				const inst = new THREE.InstancedMesh(geo, grassMat, count);
 				inst.castShadow = this.grassCastShadow;
 				inst.receiveShadow = this.grassReceiveShadow;
 				inst.instanceMatrix.setUsage(THREE.StaticDrawUsage);
