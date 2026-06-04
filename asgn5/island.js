@@ -73,6 +73,8 @@ export default class Island {
 		this.mesh.position.y = height / 2;
 		this.mesh.receiveShadow = true;
 		scene.add(this.mesh);
+        this.mesh.matrixAutoUpdate = false;
+        this.mesh.updateMatrix();
 
 		const sideHeight = height * 2.2;
 		const cliffTex = this._makeCliffTexture(512);
@@ -102,6 +104,8 @@ export default class Island {
 		this.side.position.y = -sideHeight / 2 + height / 2;
 		this.side.receiveShadow = true;
 		scene.add(this.side);
+        this.side.matrixAutoUpdate = false;
+        this.side.updateMatrix();
 
 		if (autoGenerateGrass) {
 			this.generateGrass();
@@ -324,9 +328,14 @@ export default class Island {
 						inst.setMatrixAt(i, dummy.matrix);
 					}
 					inst.instanceMatrix.needsUpdate = true;
-					this.grassGroup.add(inst);
+                    inst.matrixAutoUpdate = false;
+                    inst.updateMatrix();
+
+                    this.grassGroup.add(inst)
 				}
 
+                this.grassGroup.matrixAutoUpdate = false;
+                this.grassGroup.updateMatrix();
 				this.grassGenerated = true;
 				this.grassLoading = false;
 

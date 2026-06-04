@@ -20,7 +20,7 @@ function main() {
 	});
 
 	// OPTIMIZATION: cap pixel ratio (Retina renders 4x pixels otherwise)
-	renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+	renderer.setPixelRatio(1);	
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 	renderer.toneMapping = THREE.ACESFilmicToneMapping;
 	renderer.toneMappingExposure = 1.2;
@@ -480,6 +480,8 @@ function main() {
 					);
 
 					scene.add(tree);
+					tree.matrixAutoUpdate = false;
+					tree.updateMatrix();
 
 					if (typeof island.addGrassBlockerCircle === 'function') {
 						island.addGrassBlockerCircle(x, z, blockerRadius);
@@ -492,149 +494,6 @@ function main() {
 				console.log('Trees placed:', placed);
 				resolve(treePositions);
 			});
-		});
-	}
-
-	function addRandomClouds({
-		cloudFolder = 'obj/',
-		cloudObjPath = 'Low Poly Clouds.obj',
-		cloudMtlPath = 'Low Poly Clouds.mtl',
-		cloudCount = 20,
-		minRadius = 0,
-		maxRadius = 15,
-		minHeight = 15,
-		maxHeight = 23,
-		scaleMin = 0.75,
-		scaleMax = 1.2,
-		opacity = 0.72,
-		shadowChance = 0.0,
-	} = {}) {
-		return new Promise((resolve) => {
-			const mtlLoader = new MTLLoader();
-			mtlLoader.setPath(cloudFolder);
-
-			mtlLoader.load(
-				cloudMtlPath,
-				(materials) => {
-					materials.preload();
-
-					Object.values(materials.materials).forEach((mat) => {
-						if (!mat) return;
-						mat.color.set(0xffffff);
-						mat.roughness = 1;
-						mat.metalness = 0;
-						mat.transparent = true;
-						mat.opacity = opacity;
-						mat.depthWrite = false;
-					});
-
-					const objLoader = new OBJLoader();
-					objLoader.setPath(cloudFolder);
-					objLoader.setMaterials(materials);
-
-					objLoader.load(
-						cloudObjPath,
-						(root) => {
-							const box = new THREE.Box3().setFromObject(root);
-							const center = box.getCenter(new THREE.Vector3());
-
-							const template = new THREE.Group();
-							root.position.set(-center.x, -center.y, -center.z);
-							template.add(root);
-
-							template.traverse((child) => {
-								if (!child.isMesh) return;
-								child.castShadow = true;
-								child.receiveShadow = false;
-								child.material = new THREE.MeshStandardMaterial({
-									color: 0xffffff,
-									roughness: 1,
-									metalness: 0,
-									transparent: true,
-									opacity,
-									depthWrite: false,
-								});
-							});
-
-							const cloudGroup = new THREE.Group();
-							scene.add(cloudGroup);
-
-							const cloudPositions = [];
-							let placedClouds = 0;
-							let cloudAttempts = 0;
-							const minCloudSpacing = 9.0;
-
-							while (placedClouds < cloudCount && cloudAttempts < cloudCount * 80) {
-								cloudAttempts++;
-
-								const cloud = template.clone(true);
-								const angle = Math.random() * Math.PI * 2;
-								let dist;
-								const zoneRoll = Math.random();
-
-								if (zoneRoll < 0.35) {
-									dist = Math.sqrt(Math.random()) * 14;
-								} else if (zoneRoll < 0.75) {
-									dist = THREE.MathUtils.randFloat(14, 28);
-								} else {
-									dist = THREE.MathUtils.randFloat(28, 45);
-								}
-
-								const x = Math.cos(angle) * dist;
-								const y = THREE.MathUtils.randFloat(minHeight, maxHeight);
-								const z = Math.sin(angle) * dist;
-
-								let tooClose = false;
-								for (const p of cloudPositions) {
-									const dx = x - p.x;
-									const dz = z - p.z;
-									const dy = y - p.y;
-									if (dx * dx + dz * dz + dy * dy < minCloudSpacing * minCloudSpacing) {
-										tooClose = true;
-										break;
-									}
-								}
-								if (tooClose) continue;
-
-								const scale = THREE.MathUtils.randFloat(scaleMin, scaleMax);
-
-								cloud.position.set(x, y, z);
-								cloud.rotation.y = Math.random() * Math.PI * 2;
-								cloud.rotation.x = THREE.MathUtils.randFloat(-0.05, 0.05);
-								cloud.rotation.z = THREE.MathUtils.randFloat(-0.04, 0.04);
-
-								cloud.scale.set(
-									scale * THREE.MathUtils.randFloat(1.2, 2.0),
-									scale * THREE.MathUtils.randFloat(0.45, 0.75),
-									scale * THREE.MathUtils.randFloat(0.9, 1.5)
-								);
-
-								const shouldCastShadow = Math.random() < shadowChance;
-								cloud.traverse((child) => {
-									if (child.isMesh) child.castShadow = shouldCastShadow;
-								});
-
-								cloudGroup.add(cloud);
-								cloudPositions.push({ x, y, z });
-								placedClouds++;
-							}
-
-							console.log('Clouds placed:', placedClouds);
-							resolve(cloudGroup);
-						},
-						undefined,
-						(error) => {
-							console.error('Failed to load cloud OBJ:', error);
-							resolve(null);
-						}
-					);
-				},
-				undefined,
-				(error) => {
-					console.error('Failed to load cloud MTL:', error);
-					resolve(null);
-				}
-			);
 		});
 	}
 
@@ -651,20 +510,6 @@ function main() {
 			scaleMax: 1.2,
 			blockerRadius: 1.45,
 			minTreeSpacing: 4.5,
-		}),
-		addRandomClouds({
-			cloudFolder: 'obj/',
-			cloudObjPath: 'Low Poly Clouds.obj',
-			cloudMtlPath: 'Low Poly Clouds.mtl',
-			cloudCount: 20,
-			minRadius: 0,
-			maxRadius: 34,
-			minHeight: 30,
-			maxHeight: 35,
-			scaleMin: 0.75,
-			scaleMax: 1.2,
-			opacity: 0.72,
-			shadowChance: 0.35,
 		}),
 	]).then(() => {
 		if (typeof island.generateGrass === 'function') {
