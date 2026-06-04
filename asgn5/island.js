@@ -8,27 +8,29 @@ export default class Island {
 		wallMargin = 0.8,
 		segments = 96,
 
-		grassPath = null,
-		grassObjPath = 'obj/grass.obj',
+		groundColor = 0x3d6b27,
+		grassObjPath = 'obj/high_grass.obj',
 
-		grassCount = 140,
-		grassPatchCount = 24,
-		grassPatchRadius = 3.0,
-		grassEdgeMargin = 3.2,
-		grassClearCenterRadius = 4.6,
+		grassClusterCount = 480,
+		grassTuftsPerClusterMin = 2,
+		grassTuftsPerClusterMax = 4,
+		grassClusterRadiusMin = 0.18,
+		grassClusterRadiusMax = 1.25,
+		grassIsolatedTufts = 240,
 
-		grassScaleMin = 0.08,
-		grassScaleMax = 0.14,
+		grassEdgeMargin = 0.15,
+		grassClearCenterRadius = 0,
+
+		grassScaleMin = 0.7,
+		grassScaleMax = 1.8,
 		grassSink = 0.02,
+		grassLeanAmount = 0.55,
+		grassMinSpacing = 0.12,
 
-		grassLeanAmount = 0.08,
-		grassMinSpacing = 0.45,
+		grassCastShadow = false,
+		grassReceiveShadow = true,
 
-		exclusionZones = [
-			{ x: -2, z: 0, radius: 2.8 },
-			{ x: 2, z: 0, radius: 1.8 },
-			{ x: 0, z: 0, radius: 4.6 },
-		],
+		autoGenerateGrass = false,
 	} = {}) {
 		this.radius = radius;
 		this.height = height;
@@ -37,9 +39,13 @@ export default class Island {
 		this.surfaceY = height;
 		this.scene = scene;
 
-		this.grassCount = grassCount;
-		this.grassPatchCount = grassPatchCount;
-		this.grassPatchRadius = grassPatchRadius;
+		this.grassObjPath = grassObjPath;
+		this.grassClusterCount = grassClusterCount;
+		this.grassTuftsPerClusterMin = grassTuftsPerClusterMin;
+		this.grassTuftsPerClusterMax = grassTuftsPerClusterMax;
+		this.grassClusterRadiusMin = grassClusterRadiusMin;
+		this.grassClusterRadiusMax = grassClusterRadiusMax;
+		this.grassIsolatedTufts = grassIsolatedTufts;
 		this.grassEdgeMargin = grassEdgeMargin;
 		this.grassClearCenterRadius = grassClearCenterRadius;
 		this.grassScaleMin = grassScaleMin;
@@ -47,24 +53,18 @@ export default class Island {
 		this.grassSink = grassSink;
 		this.grassLeanAmount = grassLeanAmount;
 		this.grassMinSpacing = grassMinSpacing;
-		this.exclusionZones = exclusionZones;
+		this.grassCastShadow = grassCastShadow;
+		this.grassReceiveShadow = grassReceiveShadow;
 
-		const grassTex = grassPath
-			? textureLoader.load(grassPath)
-			: this._makeGrassTexture(1024);
-
-		grassTex.wrapS = THREE.RepeatWrapping;
-		grassTex.wrapT = THREE.RepeatWrapping;
-		grassTex.repeat.set(radius / 4.5, radius / 4.5);
-		grassTex.colorSpace = THREE.SRGBColorSpace;
-		grassTex.anisotropy = 16;
-		grassTex.minFilter = THREE.LinearMipmapLinearFilter;
-		grassTex.generateMipmaps = true;
+		this.grassBlockers = [];
+		this.grassGroup = null;
+		this.grassGenerated = false;
+		this.grassLoading = false;
 
 		const topGeo = this._makeIslandTopGeometry(radius, height, segments);
 
 		const topMat = new THREE.MeshStandardMaterial({
-			map: grassTex,
+			color: groundColor,
 			roughness: 1,
 			metalness: 0,
 		});
@@ -76,7 +76,6 @@ export default class Island {
 
 		const sideHeight = height * 2.2;
 		const cliffTex = this._makeCliffTexture(512);
-
 		cliffTex.wrapS = THREE.RepeatWrapping;
 		cliffTex.wrapT = THREE.RepeatWrapping;
 		cliffTex.repeat.set(Math.max(3, Math.round(radius / 2)), 1);
@@ -99,13 +98,63 @@ export default class Island {
 			side: THREE.DoubleSide,
 		});
 
-		const side = new THREE.Mesh(sideGeo, sideMat);
-		side.position.y = -sideHeight / 2 + height / 2;
-		side.receiveShadow = true;
-		scene.add(side);
+		this.side = new THREE.Mesh(sideGeo, sideMat);
+		this.side.position.y = -sideHeight / 2 + height / 2;
+		this.side.receiveShadow = true;
+		scene.add(this.side);
 
-		this._addGrassDetails(scene);
-		this._loadGrassObjects(grassObjPath);
+		if (autoGenerateGrass) {
+			this.generateGrass();
+		}
+	}
+
+	addGrassBlockerCircle(x, z, radius) {
+		this.grassBlockers.push({
+			type: 'circle',
+			x,
+			z,
+			radius,
+		});
+	}
+
+	addGrassBlockerFromObject(object, padding = 0.8) {
+		const box = new THREE.Box3().setFromObject(object);
+
+		box.min.x -= padding;
+		box.min.z -= padding;
+		box.max.x += padding;
+		box.max.z += padding;
+
+		this.grassBlockers.push({
+			type: 'box',
+			box,
+		});
+	}
+
+	generateGrass(force = false) {
+		if (this.grassLoading) return;
+
+		if (force) {
+			this._clearGrass();
+		}
+
+		if (this.grassGenerated) return;
+
+		this.grassLoading = true;
+		this._loadGrassObjects(this.grassObjPath);
+	}
+
+	_clearGrass() {
+		if (!this.grassGroup) {
+			this.grassGenerated = false;
+			this.grassLoading = false;
+			return;
+		}
+
+		this.scene.remove(this.grassGroup);
+		this.grassGroup = null;
+		this.grassGenerated = false;
+		this.grassLoading = false;
 	}
 
 	_makeIslandTopGeometry(radius, height, segments) {
@@ -121,19 +170,13 @@ export default class Island {
 			if (dist > radius * 0.85) {
 				const angle = Math.atan2(z, x);
 
-				let variance;
-
-				if (y > 0) {
-					variance =
-						Math.sin(angle * 3.0) * 0.08 +
-						Math.sin(angle * 7.0) * 0.05 +
-						Math.sin(angle * 13.0) * 0.03;
-				} else {
-					variance =
-						Math.sin(angle * 3.0) * 0.34 +
-						Math.sin(angle * 7.0) * 0.22 +
-						Math.sin(angle * 13.0) * 0.12;
-				}
+				const variance = y > 0
+					? Math.sin(angle * 3.0) * 0.08 +
+					  Math.sin(angle * 7.0) * 0.05 +
+					  Math.sin(angle * 13.0) * 0.03
+					: Math.sin(angle * 3.0) * 0.34 +
+					  Math.sin(angle * 7.0) * 0.22 +
+					  Math.sin(angle * 13.0) * 0.12;
 
 				const newRadius = radius + variance;
 				const scale = newRadius / dist;
@@ -149,191 +192,127 @@ export default class Island {
 		return geo;
 	}
 
-	_makeGrassTexture(size = 1024) {
-		const canvas = document.createElement('canvas');
-		canvas.width = canvas.height = size;
-		const ctx = canvas.getContext('2d');
-
-		ctx.fillStyle = '#77bd4d';
-		ctx.fillRect(0, 0, size, size);
-
-		const grassColors = [
-			'#4f9f38',
-			'#67b84a',
-			'#82cf5c',
-			'#9edb73',
-			'#3f7f32',
-			'#b8d86a',
-		];
-
-		for (let i = 0; i < 7000; i++) {
-			const x = Math.random() * size;
-			const y = Math.random() * size;
-			const len = 4 + Math.random() * 14;
-			const angle = Math.random() * Math.PI * 2;
-
-			ctx.strokeStyle = grassColors[(Math.random() * grassColors.length) | 0];
-			ctx.globalAlpha = 0.22 + Math.random() * 0.38;
-			ctx.lineWidth = 1;
-
-			ctx.beginPath();
-			ctx.moveTo(x, y);
-			ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
-			ctx.stroke();
-		}
-
-		ctx.globalAlpha = 1;
-
-		const texture = new THREE.CanvasTexture(canvas);
-		texture.needsUpdate = true;
-		return texture;
-	}
-
-	_addGrassDetails(scene) {
-		const flowerGeo = new THREE.CircleGeometry(0.035, 8);
-		const flowerColors = [0xffffff, 0xffcce5, 0xffffaa, 0xccddff];
-
-		for (let i = 0; i < 80; i++) {
-			const point = this._getRandomValidPoint();
-			if (!point) continue;
-
-			const mat = new THREE.MeshBasicMaterial({
-				color: flowerColors[(Math.random() * flowerColors.length) | 0],
-				side: THREE.DoubleSide,
-			});
-
-			const flower = new THREE.Mesh(flowerGeo, mat);
-			flower.position.set(point.x, this.surfaceY + 0.02, point.z);
-			flower.rotation.x = -Math.PI / 2;
-			scene.add(flower);
-		}
-	}
-
 	_loadGrassObjects(grassObjPath) {
-        const objLoader = new OBJLoader();
+		const objLoader = new OBJLoader();
 
-        objLoader.load(
-            grassObjPath,
-            (root) => {
-                console.log('Grass OBJ loaded:', grassObjPath);
+		objLoader.load(
+			grassObjPath,
+			(root) => {
+				console.log('Grass OBJ loaded:', grassObjPath);
 
-                const box = new THREE.Box3().setFromObject(root);
-                const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
+				const box = new THREE.Box3().setFromObject(root);
+				const center = box.getCenter(new THREE.Vector3());
 
-                root.position.x -= center.x;
-                root.position.z -= center.z;
-                root.position.y -= box.min.y;
+				root.position.x -= center.x;
+				root.position.z -= center.z;
+				root.position.y -= box.min.y;
 
-                root.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = false;
-                        child.receiveShadow = true;
+				root.traverse((child) => {
+					if (child.isMesh) {
+						child.castShadow = this.grassCastShadow;
+						child.receiveShadow = this.grassReceiveShadow;
+						child.material = new THREE.MeshStandardMaterial({
+							color: 0x5faa3f,
+							roughness: 1,
+							metalness: 0,
+							side: THREE.DoubleSide,
+						});
+					}
+				});
 
-                        child.material = new THREE.MeshStandardMaterial({
-                            color: 0x5faa3f,
-                            roughness: 1,
-                            metalness: 0,
-                            side: THREE.DoubleSide,
-                        });
-                    }
-                });
+				this.grassGroup = new THREE.Group();
+				this.scene.add(this.grassGroup);
 
-                console.log('Grass OBJ size:', size);
+				const placed = [];
+				const usableRadius = this.radius - this.grassEdgeMargin;
+				let placedCount = 0;
 
-                const placed = [];
-                let attempts = 0;
-                const maxAttempts = this.grassCount * 100;
+				const spawnGrass = (px, pz, scaleBoost = 1) => {
+					if (!this._isValidGrassPoint(px, pz)) return false;
+					if (!this._hasEnoughSpacing(px, pz, placed)) return false;
 
-                while (placed.length < this.grassCount && attempts < maxAttempts) {
-                    attempts++;
+					const grass = root.clone(true);
 
-                    const point = this._getRandomValidPoint();
-                    if (!point) continue;
-                    if (!this._hasEnoughSpacing(point.x, point.z, placed)) continue;
+					const baseScale = THREE.MathUtils.lerp(
+						this.grassScaleMin,
+						this.grassScaleMax,
+						Math.random()
+					) * scaleBoost;
 
-                    const grass = root.clone(true);
+					grass.scale.set(
+						baseScale * THREE.MathUtils.randFloat(0.65, 1.35),
+						baseScale * THREE.MathUtils.randFloat(0.7, 1.8),
+						baseScale * THREE.MathUtils.randFloat(0.65, 1.35)
+					);
 
-                    const scale = THREE.MathUtils.lerp(
-                        this.grassScaleMin,
-                        this.grassScaleMax,
-                        Math.random()
-                    );
+					grass.position.set(
+						px,
+						this.surfaceY - this.grassSink + THREE.MathUtils.randFloat(-0.015, 0.015),
+						pz
+					);
 
-                    grass.scale.set(scale, scale, scale);
-                    grass.position.set(point.x, this.surfaceY - this.grassSink, point.z);
+					grass.rotation.y = Math.random() * Math.PI * 2;
+					grass.rotation.x = THREE.MathUtils.randFloatSpread(this.grassLeanAmount);
+					grass.rotation.z = THREE.MathUtils.randFloatSpread(this.grassLeanAmount);
 
-                    grass.rotation.y = Math.random() * Math.PI * 2;
-                    grass.rotation.x = (Math.random() - 0.5) * this.grassLeanAmount;
-                    grass.rotation.z = (Math.random() - 0.5) * this.grassLeanAmount;
+					this.grassGroup.add(grass);
+					placed.push({ x: px, z: pz });
+					placedCount++;
 
-                    this.scene.add(grass);
-                    placed.push(new THREE.Vector2(point.x, point.z));
-                }
+					return true;
+				};
 
-                console.log('Grass placed:', placed.length);
-            },
-            undefined,
-            (error) => {
-                console.error('Failed to load grass OBJ:', grassObjPath, error);
-            }
-        );
-    }
+				for (let i = 0; i < this.grassClusterCount; i++) {
+					const centerAngle = Math.random() * Math.PI * 2;
+					const centerDist = Math.sqrt(Math.random()) * usableRadius;
 
-	_makeGrassPatchCenters() {
-		const centers = [];
-		let attempts = 0;
-		const usableRadius = this.radius - this.grassEdgeMargin;
+					const cx = Math.cos(centerAngle) * centerDist;
+					const cz = Math.sin(centerAngle) * centerDist;
 
-		while (centers.length < this.grassPatchCount && attempts < this.grassPatchCount * 30) {
-			attempts++;
+					if (!this._isValidGrassPoint(cx, cz)) continue;
 
-			const angle = Math.random() * Math.PI * 2;
-			const dist = Math.sqrt(Math.random()) * usableRadius;
+					const tuftsInCluster = THREE.MathUtils.randInt(
+						this.grassTuftsPerClusterMin,
+						this.grassTuftsPerClusterMax
+					);
 
-			const x = Math.cos(angle) * dist;
-			const z = Math.sin(angle) * dist;
+					const clusterRadius = THREE.MathUtils.randFloat(
+						this.grassClusterRadiusMin,
+						this.grassClusterRadiusMax
+					);
 
-			if (!this._isValidGrassPoint(x, z)) continue;
+					for (let j = 0; j < tuftsInCluster; j++) {
+						const angle = Math.random() * Math.PI * 2;
+						const dist = Math.pow(Math.random(), 1.8) * clusterRadius;
 
-			centers.push(new THREE.Vector2(x, z));
-		}
+						const px = cx + Math.cos(angle) * dist;
+						const pz = cz + Math.sin(angle) * dist;
 
-		return centers;
-	}
+						spawnGrass(px, pz, THREE.MathUtils.randFloat(0.8, 1.35));
+					}
+				}
 
-	_getRandomPatchPoint(patchCenters) {
-		if (patchCenters.length === 0) return this._getRandomValidPoint();
+				for (let i = 0; i < this.grassIsolatedTufts; i++) {
+					const angle = Math.random() * Math.PI * 2;
+					const dist = Math.sqrt(Math.random()) * usableRadius;
 
-		const patch = patchCenters[(Math.random() * patchCenters.length) | 0];
-		const angle = Math.random() * Math.PI * 2;
-		const dist = Math.sqrt(Math.random()) * this.grassPatchRadius;
+					const px = Math.cos(angle) * dist;
+					const pz = Math.sin(angle) * dist;
 
-		return {
-			x: patch.x + Math.cos(angle) * dist,
-			z: patch.y + Math.sin(angle) * dist,
-		};
-	}
+					spawnGrass(px, pz, THREE.MathUtils.randFloat(0.55, 1.1));
+				}
 
-	_getRandomValidPoint() {
-		let attempts = 0;
+				this.grassGenerated = true;
+				this.grassLoading = false;
 
-		while (attempts < 60) {
-			attempts++;
-
-			const usableRadius = this.radius - this.grassEdgeMargin;
-			const angle = Math.random() * Math.PI * 2;
-			const dist = Math.sqrt(Math.random()) * usableRadius;
-
-			const x = Math.cos(angle) * dist;
-			const z = Math.sin(angle) * dist;
-
-			if (this._isValidGrassPoint(x, z)) {
-				return { x, z };
+				console.log('Grass placed:', placedCount);
+			},
+			undefined,
+			(error) => {
+				this.grassLoading = false;
+				console.error('Failed to load grass OBJ:', grassObjPath, error);
 			}
-		}
-
-		return null;
+		);
 	}
 
 	_isValidGrassPoint(x, z) {
@@ -343,13 +322,27 @@ export default class Island {
 		if (distFromCenter > usableRadius) return false;
 		if (distFromCenter < this.grassClearCenterRadius) return false;
 
-		for (const zone of this.exclusionZones) {
-			const dx = x - zone.x;
-			const dz = z - zone.z;
-			const d = Math.sqrt(dx * dx + dz * dz);
+		for (const blocker of this.grassBlockers) {
+			if (blocker.type === 'circle') {
+				const dx = x - blocker.x;
+				const dz = z - blocker.z;
 
-			if (d < zone.radius) {
-				return false;
+				if (dx * dx + dz * dz < blocker.radius * blocker.radius) {
+					return false;
+				}
+			}
+
+			if (blocker.type === 'box') {
+				const box = blocker.box;
+
+				if (
+					x >= box.min.x &&
+					x <= box.max.x &&
+					z >= box.min.z &&
+					z <= box.max.z
+				) {
+					return false;
+				}
 			}
 		}
 
@@ -359,10 +352,9 @@ export default class Island {
 	_hasEnoughSpacing(x, z, placed) {
 		for (const p of placed) {
 			const dx = x - p.x;
-			const dz = z - p.y;
-			const distSq = dx * dx + dz * dz;
+			const dz = z - p.z;
 
-			if (distSq < this.grassMinSpacing * this.grassMinSpacing) {
+			if (dx * dx + dz * dz < this.grassMinSpacing * this.grassMinSpacing) {
 				return false;
 			}
 		}
@@ -387,8 +379,8 @@ export default class Island {
 			const x = Math.random() * size;
 			const y = Math.random() * size;
 			const r = 10 + Math.random() * 40;
-			const g = ctx.createRadialGradient(x, y, 0, x, y, r);
 
+			const g = ctx.createRadialGradient(x, y, 0, x, y, r);
 			g.addColorStop(0, tones[(Math.random() * tones.length) | 0]);
 			g.addColorStop(1, 'rgba(0,0,0,0)');
 
@@ -405,7 +397,6 @@ export default class Island {
 		for (let i = 0; i < 120; i++) {
 			const x = Math.random() * size;
 			ctx.strokeStyle = Math.random() < 0.5 ? '#4a3320' : '#a98a5a';
-
 			ctx.beginPath();
 			ctx.moveTo(x, Math.random() * size * 0.3);
 			ctx.lineTo(x + (Math.random() - 0.5) * 8, size * (0.6 + Math.random() * 0.4));
@@ -416,13 +407,15 @@ export default class Island {
 
 		const texture = new THREE.CanvasTexture(canvas);
 		texture.needsUpdate = true;
+
 		return texture;
 	}
 
 	contains(pos) {
 		const dx = pos.x - this.center.x;
 		const dz = pos.z - this.center.z;
-		return (dx * dx + dz * dz) <= (this.radius - this.wallMargin) ** 2;
+
+		return dx * dx + dz * dz <= (this.radius - this.wallMargin) ** 2;
 	}
 
 	clampPosition(pos) {
@@ -434,6 +427,7 @@ export default class Island {
 		if (distSq > maxR * maxR) {
 			const dist = Math.sqrt(distSq);
 			const scale = maxR / dist;
+
 			pos.x = this.center.x + dx * scale;
 			pos.z = this.center.z + dz * scale;
 		}

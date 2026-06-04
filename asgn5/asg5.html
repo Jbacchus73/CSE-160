@@ -54,6 +54,17 @@
       cursor: pointer;
     }
 
+    #audioToggle {
+      position: fixed;
+      top: 10px;
+      left: 220px;
+      z-index: 10;
+      padding: 8px 12px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
     #instructions {
       position: fixed;
       top: 50px;
@@ -81,10 +92,12 @@
   <canvas id="c"></canvas>
 
   <button id="switchControls">Switch to Free Roam Controls</button>
+  <button id="audioToggle">🔊 Start Audio</button>
 
   <div id="instructions">
     Orbit: drag mouse to rotate.<br>
-    Free Roam: click-drag to look, WASD to move, Space/C up/down, Shift sprint.
+    Free Roam: click-drag to look, WASD to move, Space/C up/down, Shift sprint.<br>
+    Click "Start Audio" to enable sound.
   </div>
 
   <div id="loading">
