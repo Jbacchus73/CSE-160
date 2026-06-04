@@ -5,6 +5,7 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import SpectatorControls from './SpectatorControls.js';
+import Island from './island.js';
 
 function main() {
 	const canvas = document.querySelector('#c');
@@ -26,7 +27,7 @@ function main() {
 	const near = 0.1;
 	const far = 100;
 	const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-	camera.position.set(0, 10, 20);
+	camera.position.set(0, 8, 14);
 
 	const orbitControls = new OrbitControls(camera, renderer.domElement);
 	orbitControls.target.set(0, 0, 0);
@@ -96,11 +97,9 @@ function main() {
 			this.obj = obj;
 			this.prop = prop;
 		}
-
 		get value() {
 			return THREE.MathUtils.radToDeg(this.obj[this.prop]);
 		}
-
 		set value(v) {
 			this.obj[this.prop] = THREE.MathUtils.degToRad(v);
 		}
@@ -111,70 +110,57 @@ function main() {
 			this.obj = obj;
 			this.prop = prop;
 		}
-
 		get value() {
 			return this.obj[this.prop];
 		}
-
 		set value(v) {
 			this.obj[this.prop] = parseFloat(v);
 		}
 	}
 
-	{
-		const color = 0xffffff;
-		const intensity = 2;
-		const light = new THREE.DirectionalLight(color, intensity);
-		light.position.set(-1, 2, 4);
-		scene.add(light);
-	}
+	const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+	directionalLight.position.set(-1, 2, 4);
+	scene.add(directionalLight);
+
+	const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+	scene.add(ambientLight);
+
+	const hemisphereLight = new THREE.HemisphereLight(0xb1e1ff, 0xb97a20, 1);
+	scene.add(hemisphereLight);
+
+	const island = new Island(scene, textureLoader, {
+		radius: 16,
+		grassPath: 'obj/textures/grass.png',
+		grassObjPath: 'obj/grass.obj',
+
+		grassCount: 10,
+		grassPatchCount: 10,
+		grassPatchRadius: 3.5,
+
+		grassEdgeMargin: 4.5,
+		grassClearCenterRadius: 4.6,
+
+		grassScaleMin: 0.08,
+		grassScaleMax: 0.13,
+		grassSink: 0.0,
+
+		grassLeanAmount: 0.03,
+		grassMinSpacing: 2.0,
+
+		exclusionZones: [
+			{ x: -2, z: 0, radius: 3.0 },
+			{ x: 2, z: 0, radius: 2.0 },
+			{ x: 0, z: 0, radius: 4.6 },
+		],
+	});
 
 	{
-		const color = 0xffffff;
-		const intensity = 1.2;
-		const light = new THREE.AmbientLight(color, intensity);
-		scene.add(light);
-	}
-
-	{
-		const skyColor = 0xb1e1ff;
-		const groundColor = 0xb97a20;
-		const intensity = 1;
-		const light = new THREE.HemisphereLight(skyColor, groundColor, intensity);
-		scene.add(light);
-	}
-
-	{
-		const planeSize = 4000;
-
-		const texture = textureLoader.load('resources/images/checker.png');
-		texture.wrapS = THREE.RepeatWrapping;
-		texture.wrapT = THREE.RepeatWrapping;
-		texture.magFilter = THREE.NearestFilter;
-		texture.colorSpace = THREE.SRGBColorSpace;
-
-		const repeats = planeSize / 200;
-		texture.repeat.set(repeats, repeats);
-
-		const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
-		const planeMat = new THREE.MeshPhongMaterial({
-			map: texture,
-			side: THREE.DoubleSide,
-		});
-
-		const mesh = new THREE.Mesh(planeGeo, planeMat);
-		mesh.rotation.x = Math.PI * -0.5;
-		scene.add(mesh);
-	}
-
-	{
-		const speakerBaseColor = textureLoader.load('obj/speakertextures/Multimedia Speaker_speaker_base_BaseColor.png');
-		const speakerMetallic = textureLoader.load('obj/speakertextures/Multimedia Speaker_speaker_base_Metallic.png');
-		const speakerNormal = textureLoader.load('obj/speakertextures/Multimedia Speaker_speaker_base_Normal.png');
-		const speakerRoughness = textureLoader.load('obj/speakertextures/Multimedia Speaker_speaker_base_Roughness.png');
+		const speakerBaseColor = textureLoader.load('obj/textures/Multimedia Speaker_speaker_base_BaseColor.png');
+		const speakerMetallic = textureLoader.load('obj/textures/Multimedia Speaker_speaker_base_Metallic.png');
+		const speakerNormal = textureLoader.load('obj/textures/Multimedia Speaker_speaker_base_Normal.png');
+		const speakerRoughness = textureLoader.load('obj/textures/Multimedia Speaker_speaker_base_Roughness.png');
 
 		speakerBaseColor.colorSpace = THREE.SRGBColorSpace;
-
 		speakerBaseColor.flipY = true;
 		speakerMetallic.flipY = true;
 		speakerNormal.flipY = true;
@@ -193,7 +179,7 @@ function main() {
 		const objLoader = new OBJLoader();
 
 		objLoader.load('obj/speaker.obj', (root) => {
-			root.position.set(-2, 0, 0);
+			root.position.set(-2, island.surfaceY, 0);
 			root.scale.set(5, 5, 5);
 
 			root.traverse((child) => {
@@ -205,7 +191,6 @@ function main() {
 			scene.add(root);
 
 			const box = new THREE.Box3().setFromObject(root);
-
 			const boxSize = box.getSize(new THREE.Vector3()).length();
 			const boxCenter = box.getCenter(new THREE.Vector3());
 
@@ -218,9 +203,6 @@ function main() {
 	}
 
 	/*
-	// Use this later when you have an .mtl file.
-	// Keep MTLLoader imported at the top, but leave this block commented out for now.
-
 	{
 		const mtlLoader = new MTLLoader();
 
@@ -232,17 +214,6 @@ function main() {
 
 			objLoader.load('resources/models/windmill_2/windmill.obj', (root) => {
 				scene.add(root);
-
-				const box = new THREE.Box3().setFromObject(root);
-
-				const boxSize = box.getSize(new THREE.Vector3()).length();
-				const boxCenter = box.getCenter(new THREE.Vector3());
-
-				frameArea(boxSize * 1.2, boxSize, boxCenter, camera);
-
-				orbitControls.maxDistance = boxSize * 10;
-				orbitControls.target.copy(boxCenter);
-				orbitControls.update();
 			});
 		});
 	}
@@ -286,79 +257,59 @@ function main() {
 		});
 	}
 
-	const color = 0xFFFFFF;
-	const intensity = 1;
-	const light = new THREE.DirectionalLight(color, intensity);
-	light.position.set(0, 10, 0);
-	light.target.position.set(-5, 0, 0);
-	scene.add(light);
-	scene.add(light.target);
+	const extraLight = new THREE.DirectionalLight(0xffffff, 1);
+	extraLight.position.set(0, 10, 0);
+	extraLight.target.position.set(-5, 0, 0);
+	scene.add(extraLight);
+	scene.add(extraLight.target);
 
 	class ColorGUIHelper {
-	constructor(object, prop) {
-		this.object = object;
-		this.prop = prop;
-	}
-	get value() {
-		return '#' + this.object[this.prop].getHexString();
-	}
-	set value(hexString) {
-		this.object[this.prop].set(hexString);
-	}
+		constructor(object, prop) {
+			this.object = object;
+			this.prop = prop;
+		}
+		get value() {
+			return '#' + this.object[this.prop].getHexString();
+		}
+		set value(hexString) {
+			this.object[this.prop].set(hexString);
+		}
 	}
 
 	const gui = new GUI();
-	gui.addColor(new ColorGUIHelper(light, 'color'), 'value').name('color');
-	gui.add(light, 'intensity', 0, 5, 0.01);
-	gui.add(light.target.position, 'x', -10, 10);
-	gui.add(light.target.position, 'z', -10, 10);
-	gui.add(light.target.position, 'y', 0, 10);
 
-	gui.add(new StringToNumberHelper(texture, 'wrapS'), 'value', wrapModes)
-		.name('texture.wrapS')
-		.onChange(updateTexture);
+	const lightFolder = gui.addFolder('Lights');
+	lightFolder.addColor(new ColorGUIHelper(extraLight, 'color'), 'value').name('extra light color');
+	lightFolder.add(extraLight, 'intensity', 0, 5, 0.01).name('extra intensity');
+	lightFolder.add(extraLight.target.position, 'x', -10, 10).name('target x');
+	lightFolder.add(extraLight.target.position, 'y', 0, 10).name('target y');
+	lightFolder.add(extraLight.target.position, 'z', -10, 10).name('target z');
+	lightFolder.add(directionalLight, 'intensity', 0, 5, 0.01).name('sun intensity');
+	lightFolder.add(ambientLight, 'intensity', 0, 3, 0.01).name('ambient intensity');
+	lightFolder.add(hemisphereLight, 'intensity', 0, 3, 0.01).name('hemi intensity');
 
-	gui.add(new StringToNumberHelper(texture, 'wrapT'), 'value', wrapModes)
-		.name('texture.wrapT')
-		.onChange(updateTexture);
-
-	gui.add(texture.repeat, 'x', 0, 5, 0.01)
-		.name('texture.repeat.x')
-		.onChange(updateTexture);
-
-	gui.add(texture.repeat, 'y', 0, 5, 0.01)
-		.name('texture.repeat.y')
-		.onChange(updateTexture);
-
-	gui.add(texture.offset, 'x', -2, 2, 0.01)
-		.name('texture.offset.x')
-		.onChange(updateTexture);
-
-	gui.add(texture.offset, 'y', -2, 2, 0.01)
-		.name('texture.offset.y')
-		.onChange(updateTexture);
-
-	gui.add(texture.center, 'x', -0.5, 1.5, 0.01)
-		.name('texture.center.x')
-		.onChange(updateTexture);
-
-	gui.add(texture.center, 'y', -0.5, 1.5, 0.01)
-		.name('texture.center.y')
-		.onChange(updateTexture);
-
-	gui.add(new DegRadHelper(texture, 'rotation'), 'value', -360, 360)
-		.name('texture.rotation')
-		.onChange(updateTexture);
+	const textureFolder = gui.addFolder('Texture Cube');
+	textureFolder.add(new StringToNumberHelper(texture, 'wrapS'), 'value', wrapModes)
+		.name('texture.wrapS').onChange(updateTexture);
+	textureFolder.add(new StringToNumberHelper(texture, 'wrapT'), 'value', wrapModes)
+		.name('texture.wrapT').onChange(updateTexture);
+	textureFolder.add(texture.repeat, 'x', 0, 5, 0.01).name('texture.repeat.x').onChange(updateTexture);
+	textureFolder.add(texture.repeat, 'y', 0, 5, 0.01).name('texture.repeat.y').onChange(updateTexture);
+	textureFolder.add(texture.offset, 'x', -2, 2, 0.01).name('texture.offset.x').onChange(updateTexture);
+	textureFolder.add(texture.offset, 'y', -2, 2, 0.01).name('texture.offset.y').onChange(updateTexture);
+	textureFolder.add(texture.center, 'x', -0.5, 1.5, 0.01).name('texture.center.x').onChange(updateTexture);
+	textureFolder.add(texture.center, 'y', -0.5, 1.5, 0.01).name('texture.center.y').onChange(updateTexture);
+	textureFolder.add(new DegRadHelper(texture, 'rotation'), 'value', -360, 360)
+		.name('texture.rotation').onChange(updateTexture);
 
 	const cubes = [];
 
 	loadManager.onLoad = () => {
 		loadingElem.style.display = 'none';
-
 		updateTexture();
 
 		const cube = new THREE.Mesh(geometry, materials);
-		cube.position.set(2, 1, 0);
+		cube.position.set(2, island.surfaceY + 0.5, 0);
 		scene.add(cube);
 		cubes.push(cube);
 	};
@@ -384,7 +335,6 @@ function main() {
 
 	function render(time) {
 		stats.begin();
-
 		time *= 0.001;
 
 		if (resizeRendererToDisplaySize(renderer)) {
@@ -406,10 +356,10 @@ function main() {
 			orbitControls.update();
 		} else {
 			spectatorControls.update(delta);
+			island.clampPosition(camera.position);
 		}
 
 		renderer.render(scene, camera);
-
 		stats.end();
 
 		requestAnimationFrame(render);
