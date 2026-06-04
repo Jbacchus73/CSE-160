@@ -19,12 +19,13 @@ function main() {
 		canvas,
 	});
 
-	renderer.setPixelRatio(window.devicePixelRatio);
+	// OPTIMIZATION: cap pixel ratio (Retina renders 4x pixels otherwise)
+	renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
 	renderer.toneMapping = THREE.ACESFilmicToneMapping;
 	renderer.toneMappingExposure = 1.2;
 	renderer.shadowMap.enabled = true;
-	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+	renderer.shadowMap.type = THREE.PCFShadowMap;
 
 	const stats = new Stats();
 	stats.showPanel(0);
@@ -52,9 +53,12 @@ function main() {
 		path: './audio/nature.wav',
 		volume: 0.5,
 		loop: true,
+		reverbAmount: 0.18,
+		swellAmount: 0.12,
+		swellSpeed: 0.35,
 	});
 
-		const startAmbientAudio = () => {
+	const startAmbientAudio = () => {
 		ambient.play();
 		window.removeEventListener('click', startAmbientAudio);
 		window.removeEventListener('keydown', startAmbientAudio);
@@ -99,7 +103,6 @@ function main() {
 
 	loadManager.onProgress = (urlOfLastItemLoaded, itemsLoaded, itemsTotal) => {
 		if (!progressBarElem) return;
-
 		const progress = itemsLoaded / itemsTotal;
 		progressBarElem.style.transform = `scaleX(${progress})`;
 	};
@@ -147,6 +150,7 @@ function main() {
 		grassLeanAmount: 0.55,
 		grassMinSpacing: 0.12,
 
+		// grass shadows ON
 		grassCastShadow: true,
 		grassReceiveShadow: true,
 
@@ -174,9 +178,12 @@ function main() {
 		moonIntensity: 0.75,
 		ambientDayIntensity: 1.1,
 		ambientNightIntensity: 0.18,
+
+		// updated shadow settings for crisp, stable grass shadows
 		enableShadows: true,
-		shadowSize: 4096,
-		shadowCameraSize: 20,
+		shadowSize: 2048,          // power of two
+		shadowCameraSize: 18,      // covers the radius-16 island
+		shadowFollowCamera: true,  // keeps shadows dense where you look
 
 		textureLoader,
 		skyRadius: 120,
@@ -255,7 +262,6 @@ function main() {
 	function normalizeTree(root) {
 		const box = new THREE.Box3().setFromObject(root);
 		const center = box.getCenter(new THREE.Vector3());
-
 		root.position.x -= center.x;
 		root.position.z -= center.z;
 		root.position.y -= box.min.y;
@@ -266,7 +272,6 @@ function main() {
 		const canvas = document.createElement('canvas');
 		canvas.width = size;
 		canvas.height = size;
-
 		const ctx = canvas.getContext('2d');
 
 		ctx.fillStyle = '#7a4a24';
@@ -277,7 +282,6 @@ function main() {
 			const y = Math.random() * size;
 			const w = 1 + Math.random() * 2;
 			const h = 6 + Math.random() * 16;
-
 			ctx.fillStyle = Math.random() < 0.5 ? '#5a3418' : '#9a6435';
 			ctx.fillRect(x, y, w, h);
 		}
@@ -286,7 +290,6 @@ function main() {
 			const x = Math.random() * size;
 			const y = Math.random() * size;
 			const r = 1 + Math.random() * 2;
-
 			ctx.fillStyle = Math.random() < 0.5 ? '#4a2b14' : '#b07845';
 			ctx.beginPath();
 			ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -297,7 +300,6 @@ function main() {
 		texture.wrapS = THREE.RepeatWrapping;
 		texture.wrapT = THREE.RepeatWrapping;
 		texture.repeat.set(2, 2);
-
 		return texture;
 	}
 
@@ -329,29 +331,17 @@ function main() {
 			if (Array.isArray(child.material)) {
 				child.material = child.material.map((mat) => {
 					const matName = mat && mat.name ? mat.name.toLowerCase() : '';
-
-					if (
-						matName.includes('tree_leaves') ||
-						matName.includes('leaf') ||
-						matName.includes('leaves')
-					) {
+					if (matName.includes('tree_leaves') || matName.includes('leaf') || matName.includes('leaves')) {
 						return leafMaterial.clone();
 					}
-
 					if (matName.includes('bark') || matName.includes('trunk')) {
 						return barkMaterial.clone();
 					}
-
 					return mat;
 				});
 			} else if (child.material) {
 				const matName = child.material.name ? child.material.name.toLowerCase() : '';
-
-				if (
-					matName.includes('tree_leaves') ||
-					matName.includes('leaf') ||
-					matName.includes('leaves')
-				) {
+				if (matName.includes('tree_leaves') || matName.includes('leaf') || matName.includes('leaves')) {
 					child.material = leafMaterial.clone();
 				} else if (matName.includes('bark') || matName.includes('trunk')) {
 					child.material = barkMaterial.clone();
@@ -376,21 +366,13 @@ function main() {
 
 					Object.values(materials.materials).forEach((mat) => {
 						if (!mat) return;
-
 						const name = mat.name ? mat.name.toLowerCase() : '';
-
 						mat.roughness = 1;
 						mat.metalness = 0;
-
 						if (name.includes('bark') || name.includes('trunk')) {
 							mat.color.set(0x6b3f1f);
 						}
-
-						if (
-							name.includes('leaf') ||
-							name.includes('leaves') ||
-							name.includes('tree_leaves')
-						) {
+						if (name.includes('leaf') || name.includes('leaves') || name.includes('tree_leaves')) {
 							mat.color.set(0x2f7a2f);
 							mat.side = THREE.DoubleSide;
 						}
@@ -436,11 +418,7 @@ function main() {
 		minTreeSpacing = 7.0,
 	} = {}) {
 		return new Promise((resolve) => {
-			loadTreeTemplate({
-				treeFolder,
-				treeObjPath,
-				treeMtlPath,
-			}).then((root) => {
+			loadTreeTemplate({ treeFolder, treeObjPath, treeMtlPath }).then((root) => {
 				if (!root) {
 					resolve([]);
 					return;
@@ -458,9 +436,7 @@ function main() {
 					attempts++;
 
 					const angle = Math.random() * Math.PI * 2;
-
 					let dist;
-
 					if (Math.random() < 0.65) {
 						dist = THREE.MathUtils.randFloat(8.0, maxRadius);
 					} else {
@@ -474,26 +450,22 @@ function main() {
 					for (const blocked of blockedAreas) {
 						const dx = x - blocked.x;
 						const dz = z - blocked.z;
-
 						if (dx * dx + dz * dz < blocked.radius * blocked.radius) {
 							tooClose = true;
 							break;
 						}
 					}
-
 					if (tooClose) continue;
 
 					for (const p of treePositions) {
 						const dx = x - p.x;
 						const dz = z - p.z;
 						const randomSpacing = minTreeSpacing * THREE.MathUtils.randFloat(0.75, 1.45);
-
 						if (dx * dx + dz * dz < randomSpacing * randomSpacing) {
 							tooClose = true;
 							break;
 						}
 					}
-
 					if (tooClose) continue;
 
 					const tree = root.clone(true);
@@ -548,7 +520,6 @@ function main() {
 
 					Object.values(materials.materials).forEach((mat) => {
 						if (!mat) return;
-
 						mat.color.set(0xffffff);
 						mat.roughness = 1;
 						mat.metalness = 0;
@@ -573,10 +544,8 @@ function main() {
 
 							template.traverse((child) => {
 								if (!child.isMesh) return;
-
 								child.castShadow = true;
 								child.receiveShadow = false;
-
 								child.material = new THREE.MeshStandardMaterial({
 									color: 0xffffff,
 									roughness: 1,
@@ -599,11 +568,8 @@ function main() {
 								cloudAttempts++;
 
 								const cloud = template.clone(true);
-
 								const angle = Math.random() * Math.PI * 2;
-
 								let dist;
-
 								const zoneRoll = Math.random();
 
 								if (zoneRoll < 0.35) {
@@ -619,18 +585,15 @@ function main() {
 								const z = Math.sin(angle) * dist;
 
 								let tooClose = false;
-
 								for (const p of cloudPositions) {
 									const dx = x - p.x;
 									const dz = z - p.z;
 									const dy = y - p.y;
-
 									if (dx * dx + dz * dz + dy * dy < minCloudSpacing * minCloudSpacing) {
 										tooClose = true;
 										break;
 									}
 								}
-
 								if (tooClose) continue;
 
 								const scale = THREE.MathUtils.randFloat(scaleMin, scaleMax);
@@ -647,11 +610,8 @@ function main() {
 								);
 
 								const shouldCastShadow = Math.random() < shadowChance;
-
 								cloud.traverse((child) => {
-									if (child.isMesh) {
-										child.castShadow = shouldCastShadow;
-									}
+									if (child.isMesh) child.castShadow = shouldCastShadow;
 								});
 
 								cloudGroup.add(cloud);
@@ -712,6 +672,7 @@ function main() {
 		}
 	});
 
+	// ---- GUI (defensive: only add controls for properties that exist) ----
 	const gui = new GUI();
 
 	const dayNightFolder = gui.addFolder('Day Night Cycle');
@@ -722,18 +683,28 @@ function main() {
 	dayNightFolder.add(dayNight, 'ambientDayIntensity', 0, 3, 0.01).name('day ambient');
 	dayNightFolder.add(dayNight, 'ambientNightIntensity', 0, 1, 0.01).name('night ambient');
 
+	const safeAdd = (folder, obj, prop, ...args) => {
+		if (obj && obj[prop] !== undefined) {
+			return folder.add(obj, prop, ...args);
+		}
+		console.warn(`GUI skipped missing property: ${prop}`);
+		return null;
+	};
+
 	const grassFolder = gui.addFolder('Grass');
-	grassFolder.add(island, 'grassClusterCount', 0, 1200, 1).name('clusters');
-	grassFolder.add(island, 'grassIsolatedTufts', 0, 600, 1).name('isolated tufts');
-	grassFolder.add(island, 'grassScaleMin', 0.1, 3, 0.01).name('scale min');
-	grassFolder.add(island, 'grassScaleMax', 0.1, 4, 0.01).name('scale max');
-	grassFolder.add(island, 'grassEdgeMargin', 0, 5, 0.01).name('edge margin');
-	grassFolder.add(island, 'grassMinSpacing', 0.05, 1, 0.01).name('spacing');
-	grassFolder.add({ regenerate: () => island.generateGrass(true) }, 'regenerate').name('regenerate grass');
+	safeAdd(grassFolder, island, 'grassClusterCount', 0, 1200, 1)?.name('clusters');
+	safeAdd(grassFolder, island, 'grassIsolatedTufts', 0, 600, 1)?.name('isolated tufts');
+	safeAdd(grassFolder, island, 'grassScaleMin', 0.1, 3, 0.01)?.name('scale min');
+	safeAdd(grassFolder, island, 'grassScaleMax', 0.1, 4, 0.01)?.name('scale max');
+	safeAdd(grassFolder, island, 'grassEdgeMargin', 0, 5, 0.01)?.name('edge margin');
+	safeAdd(grassFolder, island, 'grassMinSpacing', 0.05, 1, 0.01)?.name('spacing');
+	if (typeof island.generateGrass === 'function') {
+		grassFolder.add({ regenerate: () => island.generateGrass(true) }, 'regenerate').name('regenerate grass');
+	}
 
 	function resizeRendererToDisplaySize(renderer) {
 		const canvas = renderer.domElement;
-		const pixelRatio = window.devicePixelRatio;
+		const pixelRatio = Math.min(window.devicePixelRatio, 1.5);
 		const width = Math.floor(canvas.clientWidth * pixelRatio);
 		const height = Math.floor(canvas.clientHeight * pixelRatio);
 		const needResize = canvas.width !== width || canvas.height !== height;
@@ -755,6 +726,7 @@ function main() {
 		}
 
 		const delta = clock.getDelta();
+		ambient.update(delta);
 
 		dayNight.update(delta, camera);
 

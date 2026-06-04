@@ -109,35 +109,21 @@ export default class Island {
 	}
 
 	addGrassBlockerCircle(x, z, radius) {
-		this.grassBlockers.push({
-			type: 'circle',
-			x,
-			z,
-			radius,
-		});
+		this.grassBlockers.push({ type: 'circle', x, z, radius });
 	}
 
 	addGrassBlockerFromObject(object, padding = 0.8) {
 		const box = new THREE.Box3().setFromObject(object);
-
 		box.min.x -= padding;
 		box.min.z -= padding;
 		box.max.x += padding;
 		box.max.z += padding;
-
-		this.grassBlockers.push({
-			type: 'box',
-			box,
-		});
+		this.grassBlockers.push({ type: 'box', box });
 	}
 
 	generateGrass(force = false) {
 		if (this.grassLoading) return;
-
-		if (force) {
-			this._clearGrass();
-		}
-
+		if (force) this._clearGrass();
 		if (this.grassGenerated) return;
 
 		this.grassLoading = true;
@@ -150,6 +136,18 @@ export default class Island {
 			this.grassLoading = false;
 			return;
 		}
+
+		// dispose instanced meshes to free GPU memory
+		this.grassGroup.traverse((child) => {
+			if (child.isInstancedMesh) {
+				child.geometry.dispose();
+				if (Array.isArray(child.material)) {
+					child.material.forEach((m) => m.dispose());
+				} else if (child.material) {
+					child.material.dispose();
+				}
+			}
+		});
 
 		this.scene.remove(this.grassGroup);
 		this.grassGroup = null;
@@ -200,38 +198,50 @@ export default class Island {
 			(root) => {
 				console.log('Grass OBJ loaded:', grassObjPath);
 
+				// center horizontally + sit base at y=0 (same as before)
 				const box = new THREE.Box3().setFromObject(root);
 				const center = box.getCenter(new THREE.Vector3());
-
 				root.position.x -= center.x;
 				root.position.z -= center.z;
 				root.position.y -= box.min.y;
+				root.updateMatrixWorld(true);
 
+				// collect every mesh's geometry (baked with its world transform)
+				// so a multi-mesh OBJ still instances correctly.
+				const grassMat = new THREE.MeshStandardMaterial({
+					color: 0x5faa3f,
+					roughness: 1,
+					metalness: 0,
+					side: THREE.DoubleSide,
+				});
+
+				const sourceGeometries = [];
 				root.traverse((child) => {
 					if (child.isMesh) {
-						child.castShadow = this.grassCastShadow;
-						child.receiveShadow = this.grassReceiveShadow;
-						child.material = new THREE.MeshStandardMaterial({
-							color: 0x5faa3f,
-							roughness: 1,
-							metalness: 0,
-							side: THREE.DoubleSide,
-						});
+						const g = child.geometry.clone();
+						g.applyMatrix4(child.matrixWorld); // bake offset/rotation into verts
+						sourceGeometries.push(g);
 					}
 				});
+
+				if (sourceGeometries.length === 0) {
+					console.error('No mesh found in grass OBJ');
+					this.grassLoading = false;
+					return;
+				}
 
 				this.grassGroup = new THREE.Group();
 				this.scene.add(this.grassGroup);
 
+				// ---- placement: identical logic to before, but we record
+				//      transforms into an array instead of cloning meshes ----
 				const placed = [];
+				const transforms = [];
 				const usableRadius = this.radius - this.grassEdgeMargin;
-				let placedCount = 0;
 
 				const spawnGrass = (px, pz, scaleBoost = 1) => {
 					if (!this._isValidGrassPoint(px, pz)) return false;
 					if (!this._hasEnoughSpacing(px, pz, placed)) return false;
-
-					const grass = root.clone(true);
 
 					const baseScale = THREE.MathUtils.lerp(
 						this.grassScaleMin,
@@ -239,26 +249,19 @@ export default class Island {
 						Math.random()
 					) * scaleBoost;
 
-					grass.scale.set(
-						baseScale * THREE.MathUtils.randFloat(0.65, 1.35),
-						baseScale * THREE.MathUtils.randFloat(0.7, 1.8),
-						baseScale * THREE.MathUtils.randFloat(0.65, 1.35)
-					);
+					transforms.push({
+						x: px,
+						y: this.surfaceY - this.grassSink + THREE.MathUtils.randFloat(-0.015, 0.015),
+						z: pz,
+						sx: baseScale * THREE.MathUtils.randFloat(0.65, 1.35),
+						sy: baseScale * THREE.MathUtils.randFloat(0.7, 1.8),
+						sz: baseScale * THREE.MathUtils.randFloat(0.65, 1.35),
+						ry: Math.random() * Math.PI * 2,
+						rx: THREE.MathUtils.randFloatSpread(this.grassLeanAmount),
+						rz: THREE.MathUtils.randFloatSpread(this.grassLeanAmount),
+					});
 
-					grass.position.set(
-						px,
-						this.surfaceY - this.grassSink + THREE.MathUtils.randFloat(-0.015, 0.015),
-						pz
-					);
-
-					grass.rotation.y = Math.random() * Math.PI * 2;
-					grass.rotation.x = THREE.MathUtils.randFloatSpread(this.grassLeanAmount);
-					grass.rotation.z = THREE.MathUtils.randFloatSpread(this.grassLeanAmount);
-
-					this.grassGroup.add(grass);
 					placed.push({ x: px, z: pz });
-					placedCount++;
-
 					return true;
 				};
 
@@ -302,10 +305,35 @@ export default class Island {
 					spawnGrass(px, pz, THREE.MathUtils.randFloat(0.55, 1.1));
 				}
 
+				// ---- build one InstancedMesh per source geometry ----
+				const dummy = new THREE.Object3D();
+				const count = transforms.length;
+
+				for (const geo of sourceGeometries) {
+					const inst = new THREE.InstancedMesh(geo, grassMat, count);
+					inst.castShadow = this.grassCastShadow;
+					inst.receiveShadow = this.grassReceiveShadow;
+					inst.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+
+					for (let i = 0; i < count; i++) {
+						const t = transforms[i];
+						dummy.position.set(t.x, t.y, t.z);
+						dummy.rotation.set(t.rx, t.ry, t.rz);
+						dummy.scale.set(t.sx, t.sy, t.sz);
+						dummy.updateMatrix();
+						inst.setMatrixAt(i, dummy.matrix);
+					}
+					inst.instanceMatrix.needsUpdate = true;
+					this.grassGroup.add(inst);
+				}
+
 				this.grassGenerated = true;
 				this.grassLoading = false;
 
-				console.log('Grass placed:', placedCount);
+				console.log(
+					'Grass placed:', count,
+					'| draw calls:', sourceGeometries.length
+				);
 			},
 			undefined,
 			(error) => {
@@ -326,21 +354,12 @@ export default class Island {
 			if (blocker.type === 'circle') {
 				const dx = x - blocker.x;
 				const dz = z - blocker.z;
-
-				if (dx * dx + dz * dz < blocker.radius * blocker.radius) {
-					return false;
-				}
+				if (dx * dx + dz * dz < blocker.radius * blocker.radius) return false;
 			}
 
 			if (blocker.type === 'box') {
 				const box = blocker.box;
-
-				if (
-					x >= box.min.x &&
-					x <= box.max.x &&
-					z >= box.min.z &&
-					z <= box.max.z
-				) {
+				if (x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z) {
 					return false;
 				}
 			}
@@ -353,12 +372,10 @@ export default class Island {
 		for (const p of placed) {
 			const dx = x - p.x;
 			const dz = z - p.z;
-
 			if (dx * dx + dz * dz < this.grassMinSpacing * this.grassMinSpacing) {
 				return false;
 			}
 		}
-
 		return true;
 	}
 
@@ -414,7 +431,6 @@ export default class Island {
 	contains(pos) {
 		const dx = pos.x - this.center.x;
 		const dz = pos.z - this.center.z;
-
 		return dx * dx + dz * dz <= (this.radius - this.wallMargin) ** 2;
 	}
 
@@ -427,7 +443,6 @@ export default class Island {
 		if (distSq > maxR * maxR) {
 			const dist = Math.sqrt(distSq);
 			const scale = maxR / dist;
-
 			pos.x = this.center.x + dx * scale;
 			pos.z = this.center.z + dz * scale;
 		}
