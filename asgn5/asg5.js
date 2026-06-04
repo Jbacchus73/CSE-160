@@ -479,7 +479,7 @@ function main() {
 		grassCullMaxDistance: 20,
 		grassCullExtraMargin: 1.05,
 		grassForwardDotLimit: 0.35,
-		grassSimplifyRatio: 0.9,
+		grassSimplifyRatio: 0.93,
 		grassCullingDebug: false,
 
 		autoGenerateGrass: false,
