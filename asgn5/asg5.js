@@ -151,7 +151,7 @@ function main() {
 		grassMinSpacing: 0.12,
 
 		// grass shadows ON
-		grassCastShadow: true,
+		grassCastShadow: false,
 		grassReceiveShadow: true,
 
 		autoGenerateGrass: true,
