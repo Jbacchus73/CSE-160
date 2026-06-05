@@ -71,23 +71,36 @@
 			position: fixed;
 			left: 22px;
 			bottom: 22px;
-			padding: 15px 17px;
-			min-width: 235px;
-			background: rgba(245, 232, 178, 0.92);
-			border: 2px solid rgba(72, 54, 28, 0.52);
+			padding: 16px 18px;
+			min-width: 270px;
+			background: rgba(245, 232, 178, 0.94);
+			border: 2px solid rgba(72, 54, 28, 0.58);
 			border-radius: 14px;
-			box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+			box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
 			color: #352816;
 			text-shadow: none;
 			font-size: 15px;
-			line-height: 1.65;
+			line-height: 1.7;
 		}
 
-		#hudDirections span {
+		#hudDirections h3 {
+			margin: 0 0 8px;
+			font-size: 16px;
+			color: #4a3117;
+		}
+
+		#hudDirections span,
+		.key {
 			display: inline-block;
-			min-width: 82px;
-			color: #5b3f1f;
+			min-width: 90px;
+			margin-right: 6px;
+			padding: 2px 6px;
+			background: rgba(255, 248, 218, 0.75);
+			border: 1px solid rgba(72, 54, 28, 0.35);
+			border-radius: 6px;
+			color: #4a3117;
 			font-weight: 700;
+			text-align: center;
 		}
 
 		#hudMode {
@@ -109,15 +122,15 @@
 			position: fixed;
 			right: 22px;
 			top: 22px;
-			width: 285px;
+			width: 300px;
 			padding: 11px 13px;
-			background: rgba(245, 232, 178, 0.76);
-			border: 2px solid rgba(72, 54, 28, 0.36);
+			background: rgba(245, 232, 178, 0.78);
+			border: 2px solid rgba(72, 54, 28, 0.4);
 			border-radius: 12px;
 			color: #352816;
 			font-size: 14px;
 			font-weight: 700;
-			line-height: 1.35;
+			line-height: 1.4;
 			box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
 			text-shadow: none;
 		}
@@ -255,6 +268,33 @@
 			color: #513719;
 		}
 
+		.controlList {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 10px 14px;
+			font-size: 14px;
+		}
+
+		.controlItem {
+			padding: 9px 10px;
+			background: rgba(255, 248, 218, 0.38);
+			border: 1px solid rgba(86, 63, 31, 0.22);
+			border-radius: 10px;
+		}
+
+		.controlItem b {
+			display: inline-block;
+			margin-bottom: 4px;
+			color: #4a3117;
+		}
+
+		.controlNote {
+			margin: 12px 0 0;
+			font-size: 14px;
+			font-weight: 700;
+			color: #513719;
+		}
+
 		.graderNotes ul,
 		.possibleMissed ul {
 			margin: 0;
@@ -279,12 +319,16 @@
 
 			#hudDirections {
 				font-size: 13px;
-				min-width: 210px;
+				min-width: 230px;
 			}
 
 			#hudAdvisory {
 				width: 230px;
 				font-size: 12px;
+			}
+
+			.controlList {
+				grid-template-columns: 1fr;
 			}
 		}
 	</style>
@@ -310,15 +354,17 @@
 		<div id="hudTitle">Studio Island</div>
 
 		<div id="hudDirections">
-			<div><span>WASD</span> Move</div>
-			<div><span>Mouse</span> Look</div>
-			<div><span>Tab</span> Switch cam</div>
-			<div><span>Esc</span> Settings</div>
+			<h3>Controls</h3>
+			<div><span>WASD</span> Move around</div>
+			<div><span>Mouse</span> Look around</div>
+			<div><span>Tab</span> Switch camera</div>
+			<div><span>Esc</span> Open settings</div>
 		</div>
 
 		<div id="hudAdvisory">
-			Tip: turn on music + ambient audio<br>
-			Free roam: click + drag to look around
+			Tip: Turn on music and ambient audio in settings (Music may take a second to load)<br>
+			Free roam: click + drag to look around<br>
+      Please use resume to exit, DO NOT PRESS ESC to exit settings
 		</div>
 
 		<div id="hudMode">Walk Camera</div>
@@ -329,7 +375,7 @@
 			<div id="settingsHeader">
 				<div>
 					<h1>Settings</h1>
-					<p>Audio and camera options</p>
+					<p>Audio, camera, and controls</p>
 				</div>
 				<button id="resumeBtn">Resume</button>
 			</div>
@@ -375,6 +421,36 @@
 					</div>
 				</section>
 
+				<section class="settingsCard">
+					<h2>Controls</h2>
+
+					<div class="controlList">
+						<div class="controlItem">
+							<b>Walk Mode</b><br>
+							WASD to move, mouse to look.
+						</div>
+
+						<div class="controlItem">
+							<b>Free Roam</b><br>
+							WASD to move, click + drag to look.
+						</div>
+
+						<div class="controlItem">
+							<b>Tab</b><br>
+							Switch between walk and free roam.
+						</div>
+
+						<div class="controlItem">
+							<b>Esc</b><br>
+							Open or close this settings menu.
+						</div>
+					</div>
+
+					<p class="controlNote">
+						After closing settings in walk mode, click the game screen once if the mouse is visible or press tab to change views and fix
+					</p>
+				</section>
+
 				<section class="settingsCard graderNotes">
 					<h2>Notes for Grader</h2>
 					<ul>
@@ -397,6 +473,6 @@
 		</div>
 	</div>
 
-	<script type="module" src="./asg5.js?v=6"></script>
+	<script type="module" src="./asg5.js?v=7"></script>
 </body>
 </html>
