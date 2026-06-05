@@ -34,7 +34,7 @@ export default class Island {
 		grassChunkSize = 4.5,
 		grassCullMaxDistance = 40,
 		grassCullExtraMargin = 2.5,
-		grassForwardDotLimit = -0.5,
+		grassForwardDotLimit = 0.05,
 		grassCullingDebug = false,
 
 		grassSimplifyRatio = 0.95,

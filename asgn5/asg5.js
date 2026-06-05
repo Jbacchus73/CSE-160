@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
-import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import SpectatorControls from './SpectatorControls.js';
@@ -9,6 +8,8 @@ import DayNight from './daynight.js';
 import Studio from './studio.js';
 import AmbientAudio from './audio.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import SpeakerAudio from './SpeakerAudio.js';
+
 
 class WalkControls {
 	constructor(camera, domElement, island, {
@@ -115,7 +116,7 @@ function main() {
 	renderer.toneMapping = THREE.ACESFilmicToneMapping;
 	renderer.toneMappingExposure = 1.2;
 	renderer.shadowMap.enabled = true;
-	renderer.shadowMap.type = THREE.PCFSoftShadowMap
+	renderer.shadowMap.type = THREE.PCFShadowMap;
 
 	const stats = new Stats();
 	stats.showPanel(0);
@@ -142,14 +143,20 @@ function main() {
 		swellSpeed: 0.35,
 	});
 
-	const startAmbientAudio = () => {
-		ambient.play();
-		window.removeEventListener('click', startAmbientAudio);
-		window.removeEventListener('keydown', startAmbientAudio);
-	};
-
-	window.addEventListener('click', startAmbientAudio);
-	window.addEventListener('keydown', startAmbientAudio);
+	const speakerAudio = new SpeakerAudio(ambient.listener, {
+		tracks: [
+			'audio/track1.mp3',
+			'audio/track2.mp3',
+			'audio/track3.mp3',
+			'audio/track4.mp3',
+			'audio/track5.mp3',
+			'audio/track6.mp3',
+		],
+		volume: 0.85,
+		refDistance: 2,
+		maxDistance: 25,
+		rolloffFactor: 1.6,
+	});
 
 	let activeControls = 'walk';
 	let renderInfoTimer = 0;
@@ -197,21 +204,15 @@ function main() {
 
 	function getGeometryTriangleCount(geometry) {
 		if (!geometry) return 0;
-
-		if (geometry.index) {
-			return Math.floor(geometry.index.count / 3);
-		}
-
+		if (geometry.index) return Math.floor(geometry.index.count / 3);
 		if (geometry.attributes && geometry.attributes.position) {
 			return Math.floor(geometry.attributes.position.count / 3);
 		}
-
 		return 0;
 	}
 
 	function logTriangleCounts(scene) {
 		const rows = [];
-
 		scene.traverse((object) => {
 			if (!object.isMesh && !object.isInstancedMesh) return;
 			if (!object.geometry) return;
@@ -221,11 +222,8 @@ function main() {
 			const triangles = baseTriangles * instances;
 
 			let materialName = 'none';
-
 			if (Array.isArray(object.material)) {
-				materialName = object.material
-					.map((mat) => mat?.name || mat?.type || 'mat')
-					.join(', ');
+				materialName = object.material.map((mat) => mat?.name || mat?.type || 'mat').join(', ');
 			} else if (object.material) {
 				materialName = object.material.name || object.material.type || 'material';
 			}
@@ -242,10 +240,8 @@ function main() {
 		});
 
 		rows.sort((a, b) => b.triangles - a.triangles);
-
 		console.log('--- TOP TRIANGLE SOURCES ---');
 		console.table(rows.slice(0, 25));
-
 		const total = rows.reduce((sum, row) => sum + row.triangles, 0);
 		console.log('Total counted scene triangles:', total);
 	}
@@ -259,7 +255,6 @@ function main() {
 	} = {}) {
 		const box = new THREE.Box3().setFromObject(object);
 		const sphere = box.getBoundingSphere(new THREE.Sphere());
-
 		cullables.push({
 			object,
 			center: sphere.center.clone(),
@@ -272,8 +267,6 @@ function main() {
 		camera.updateMatrixWorld();
 		cullingMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
 		cullingFrustum.setFromProjectionMatrix(cullingMatrix);
-
-		let visibleCount = 0;
 
 		for (const item of cullables) {
 			if (!item.object) continue;
@@ -288,23 +281,7 @@ function main() {
 
 			cullingSphere.center.copy(item.center);
 			cullingSphere.radius = item.radius;
-
 			item.object.visible = cullingFrustum.intersectsSphere(cullingSphere);
-
-			if (item.object.visible) visibleCount++;
-		}
-
-		const DEBUG_CULLING = false;
-
-		if (DEBUG_CULLING) {
-			let grassText = '';
-
-			if (island && typeof island.getGrassCullingStats === 'function') {
-				const grassStats = island.getGrassCullingStats();
-				grassText = ` | grass chunks: ${grassStats.visible} / ${grassStats.total}`;
-			}
-
-			console.log(`visible cullables: ${visibleCount} / ${cullables.length}${grassText}`);
 		}
 	}
 
@@ -313,17 +290,12 @@ function main() {
 		const dz = position.z - house.z;
 		const c = Math.cos(house.rotationY);
 		const s = Math.sin(house.rotationY);
-
-		return {
-			x: c * dx - s * dz,
-			z: s * dx + c * dz,
-		};
+		return { x: c * dx - s * dz, z: s * dx + c * dz };
 	}
 
 	function houseLocalToWorld(local, house) {
 		const c = Math.cos(house.rotationY);
 		const s = Math.sin(house.rotationY);
-
 		return {
 			x: house.x + c * local.x + s * local.z,
 			z: house.z - s * local.x + c * local.z,
@@ -346,12 +318,7 @@ function main() {
 			return true;
 		}
 
-		if (
-			point.x >= rect.minX &&
-			point.x <= rect.maxX &&
-			point.z >= rect.minZ &&
-			point.z <= rect.maxZ
-		) {
+		if (point.x >= rect.minX && point.x <= rect.maxX && point.z >= rect.minZ && point.z <= rect.maxZ) {
 			const left = Math.abs(point.x - rect.minX);
 			const right = Math.abs(rect.maxX - point.x);
 			const bottom = Math.abs(point.z - rect.minZ);
@@ -397,44 +364,16 @@ function main() {
 		const doorRight = house.doorCenterX + house.doorwayWidth / 2;
 
 		const wallRects = [
-			{
-				minX: -halfW - t / 2,
-				maxX: -halfW + t / 2,
-				minZ: -halfD,
-				maxZ: halfD,
-			},
-			{
-				minX: halfW - t / 2,
-				maxX: halfW + t / 2,
-				minZ: -halfD,
-				maxZ: halfD,
-			},
-			{
-				minX: -halfW,
-				maxX: halfW,
-				minZ: -halfD - t / 2,
-				maxZ: -halfD + t / 2,
-			},
-			{
-				minX: -halfW,
-				maxX: doorLeft,
-				minZ: halfD - t / 2,
-				maxZ: halfD + t / 2,
-			},
-			{
-				minX: doorRight,
-				maxX: halfW,
-				minZ: halfD - t / 2,
-				maxZ: halfD + t / 2,
-			},
+			{ minX: -halfW - t / 2, maxX: -halfW + t / 2, minZ: -halfD, maxZ: halfD },
+			{ minX: halfW - t / 2, maxX: halfW + t / 2, minZ: -halfD, maxZ: halfD },
+			{ minX: -halfW, maxX: halfW, minZ: -halfD - t / 2, maxZ: -halfD + t / 2 },
+			{ minX: -halfW, maxX: doorLeft, minZ: halfD - t / 2, maxZ: halfD + t / 2 },
+			{ minX: doorRight, maxX: halfW, minZ: halfD - t / 2, maxZ: halfD + t / 2 },
 		];
 
 		let changed = false;
-
 		for (const rect of wallRects) {
-			if (pushCircleOutOfRectLocal(local, rect, radius)) {
-				changed = true;
-			}
+			if (pushCircleOutOfRectLocal(local, rect, radius)) changed = true;
 		}
 
 		if (changed) {
@@ -476,9 +415,9 @@ function main() {
 		grassReceiveShadow: true,
 
 		grassChunkSize: 4.5,
-		grassCullMaxDistance: 20,
+		grassCullMaxDistance: 40,
 		grassCullExtraMargin: 1.05,
-		grassForwardDotLimit: 0.35,
+		grassForwardDotLimit: -1,
 		grassSimplifyRatio: 0.93,
 		grassCullingDebug: false,
 
@@ -494,15 +433,57 @@ function main() {
 		collisionHandler: applyWorldCollisions,
 	});
 
+	// ---------------- Escape settings menu ----------------
+	const menuOverlay = document.querySelector('#menuOverlay');
+	const resumeBtn = document.querySelector('#resumeBtn');
+	let menuOpen = false;
+
+	function openMenu() {
+		if (menuOpen) return;
+		menuOpen = true;
+		menuOverlay.classList.add('open');
+		// release walk look so the cursor is usable in the menu
+		if (activeControls === 'walk') walkControls.disable();
+	}
+
+	function closeMenu() {
+		if (!menuOpen) return;
+		menuOpen = false;
+		menuOverlay.classList.remove('open');
+		// re-enter walk look-mode if that's the active camera
+		if (activeControls === 'walk') walkControls.enable();
+	}
+
+	function toggleMenu() {
+		menuOpen ? closeMenu() : openMenu();
+	}
+
+	if (resumeBtn) resumeBtn.addEventListener('click', closeMenu);
+
+	// Esc toggles the menu. In walk mode the browser also fires Esc to exit
+	// pointer-lock; that just disables walk look, and we open the menu here.
+	window.addEventListener('keydown', (e) => {
+		if (e.code === 'Escape') {
+			e.preventDefault();
+			toggleMenu();
+		}
+	});
+
+	// click outside the panel closes
+	menuOverlay.addEventListener('click', (e) => {
+		if (e.target === menuOverlay) closeMenu();
+	});
+
+	// canvas click: enter walk look-mode (only when menu is closed)
 	renderer.domElement.addEventListener('click', () => {
-		if (activeControls === 'walk') {
+		if (!menuOpen && activeControls === 'walk') {
 			walkControls.enable();
 		}
 	});
 
+	// camera mode switch button
 	if (switchButton) {
 		switchButton.textContent = 'Switch to Free Roam Controls';
-
 		switchButton.addEventListener('click', () => {
 			if (activeControls === 'walk') {
 				activeControls = 'spectator';
@@ -528,14 +509,22 @@ function main() {
 		rotationY: collisionObjects.house.rotationY,
 	});
 
-	addCullable(studio.group, {
-		maxDistance: 55,
-		extraMargin: 1.35,
-		minRadius: 8,
-	});
+	// poll until the studio speakers exist, then attach emitters
+	function attachSpeakerAudio() {
+		if (studio.speakers && studio.speakers.left && studio.speakers.right) {
+			speakerAudio.attachToSpeaker(studio.speakers.left);
+			speakerAudio.attachToSpeaker(studio.speakers.right);
+			console.log('Speaker audio emitters attached');
+		} else {
+			setTimeout(attachSpeakerAudio, 200);
+		}
+	}
+	attachSpeakerAudio();
+
+	addCullable(studio.group, { maxDistance: 55, extraMargin: 1.35, minRadius: 8 });
 
 	if (typeof island.addGrassBlockerCircle === 'function') {
-		island.addGrassBlockerCircle(5, -10.5, 5.6);
+		island.addGrassBlockerCircle(5, -10.5, 5.7);
 	}
 
 	const dayNight = new DayNight(scene, {
@@ -559,67 +548,48 @@ function main() {
 		nightSky: 'skycube/night.png',
 	});
 
-	function loadSpeaker() {
-		return new Promise((resolve) => {
-			const speakerBaseColor = textureLoader.load('obj/textures/Multimedia Speaker_speaker_base_BaseColor.png');
-			const speakerMetallic = textureLoader.load('obj/textures/Multimedia Speaker_speaker_base_Metallic.png');
-			const speakerNormal = textureLoader.load('obj/textures/Multimedia Speaker_speaker_base_Normal.png');
-			const speakerRoughness = textureLoader.load('obj/textures/Multimedia Speaker_speaker_base_Roughness.png');
+	// ---- wire menu sliders to dayNight ----
+	function bindSlider(sliderId, valueId, obj, prop, format = (v) => v.toFixed(2)) {
+		const slider = document.querySelector(sliderId);
+		const valueEl = document.querySelector(valueId);
+		if (!slider) return;
 
-			speakerBaseColor.colorSpace = THREE.SRGBColorSpace;
-			speakerBaseColor.flipY = true;
-			speakerMetallic.flipY = true;
-			speakerNormal.flipY = true;
-			speakerRoughness.flipY = true;
+		slider.value = obj[prop];
+		if (valueEl) valueEl.textContent = format(obj[prop]);
 
-			const speakerMaterial = new THREE.MeshStandardMaterial({
-				map: speakerBaseColor,
-				metalnessMap: speakerMetallic,
-				normalMap: speakerNormal,
-				roughnessMap: speakerRoughness,
-				metalness: 0.6,
-				roughness: 0.75,
-				normalScale: new THREE.Vector2(1.5, 1.5),
-			});
-
-			const objLoader = new OBJLoader();
-
-			objLoader.load(
-				'obj/speaker.obj',
-				(root) => {
-					root.position.set(-2, island.surfaceY, 0);
-					root.scale.set(5, 5, 5);
-
-					root.traverse((child) => {
-						if (child.isMesh) {
-							child.material = speakerMaterial;
-							child.castShadow = true;
-							child.receiveShadow = true;
-						}
-					});
-
-					scene.add(root);
-
-					addCullable(root, {
-						maxDistance: 45,
-						extraMargin: 1.25,
-						minRadius: 4,
-					});
-
-					if (typeof island.addGrassBlockerCircle === 'function') {
-						island.addGrassBlockerCircle(-2, 0, 3.5);
-					}
-
-					resolve(root);
-				},
-				undefined,
-				(error) => {
-					console.error('Failed to load speaker:', error);
-					resolve(null);
-				}
-			);
+		slider.addEventListener('input', () => {
+			const v = parseFloat(slider.value);
+			obj[prop] = v;
+			if (valueEl) valueEl.textContent = format(v);
 		});
 	}
+
+	bindSlider('#speedSlider', '#speedVal', dayNight, 'speed', (v) => v.toFixed(3));
+	bindSlider('#sunSlider', '#sunVal', dayNight, 'sunIntensity');
+	bindSlider('#moonSlider', '#moonVal', dayNight, 'moonIntensity');
+
+	// ---- audio toggle (now lives in the menu) ----
+	const audioToggle = document.querySelector('#audioToggle');
+	let audioOn = false;
+	if (audioToggle) {
+		audioToggle.addEventListener('click', () => {
+			if (!audioOn) {
+				ambient.play();
+				audioToggle.textContent = '🔇 Mute Audio';
+				audioOn = true;
+			} else {
+				ambient.pause();
+				audioToggle.textContent = '🔊 Start Audio';
+				audioOn = false;
+			}
+		});
+	}
+
+	document.querySelector('#musicPlay')?.addEventListener('click', () => {
+	speakerAudio.isPlaying ? speakerAudio.pause() : speakerAudio.play();
+	});
+	document.querySelector('#musicNext')?.addEventListener('click', () => speakerAudio.next());
+	document.querySelector('#musicPrev')?.addEventListener('click', () => speakerAudio.prev());
 
 	function normalizeTree(root) {
 		const box = new THREE.Box3().setFromObject(root);
@@ -771,7 +741,7 @@ function main() {
 		treeFolder = 'obj/',
 		treeObjPath = 'tree.obj',
 		treeMtlPath = 'tree.mtl',
-		treeCount = 8,
+		treeCount = 10,
 		minRadius = 3.5,
 		maxRadius = 14.6,
 		scaleMin = 0.8,
@@ -851,21 +821,13 @@ function main() {
 					tree.updateMatrix();
 					tree.updateMatrixWorld(true);
 
-					addCullable(tree, {
-						maxDistance: 60,
-						extraMargin: 1.35,
-						minRadius: 4,
-					});
+					addCullable(tree, { maxDistance: 60, extraMargin: 1.35, minRadius: 4 });
 
 					if (typeof island.addGrassBlockerCircle === 'function') {
 						island.addGrassBlockerCircle(x, z, blockerRadius);
 					}
 
-					collisionObjects.treeCircles.push({
-						x,
-						z,
-						radius: 0.75 * scale,
-					});
+					collisionObjects.treeCircles.push({ x, z, radius: 0.75 * scale });
 
 					treePositions.push({ x, z });
 					placed++;
@@ -878,7 +840,6 @@ function main() {
 	}
 
 	Promise.allSettled([
-		loadSpeaker(),
 		addRandomTrees({
 			treeFolder: 'obj/',
 			treeObjPath: 'tree.obj',
@@ -895,41 +856,7 @@ function main() {
 		if (typeof island.generateGrass === 'function') {
 			island.generateGrass(true);
 		}
-
-		setTimeout(() => {
-			logTriangleCounts(scene);
-		}, 4500);
 	});
-
-	const gui = new GUI();
-
-	const dayNightFolder = gui.addFolder('Day Night Cycle');
-	dayNightFolder.add(dayNight, 'speed', 0, 0.3, 0.001).name('cycle speed');
-	dayNightFolder.add(dayNight, 'radius', 10, 80, 1).name('sun/moon orbit');
-	dayNightFolder.add(dayNight, 'sunIntensity', 0, 6, 0.01).name('sun intensity');
-	dayNightFolder.add(dayNight, 'moonIntensity', 0, 3, 0.01).name('moon intensity');
-	dayNightFolder.add(dayNight, 'ambientDayIntensity', 0, 3, 0.01).name('day ambient');
-	dayNightFolder.add(dayNight, 'ambientNightIntensity', 0, 1, 0.01).name('night ambient');
-
-	const safeAdd = (folder, obj, prop, ...args) => {
-		if (obj && obj[prop] !== undefined) {
-			return folder.add(obj, prop, ...args);
-		}
-		console.warn(`GUI skipped missing property: ${prop}`);
-		return null;
-	};
-
-	const grassFolder = gui.addFolder('Grass');
-	safeAdd(grassFolder, island, 'grassClusterCount', 0, 1200, 1)?.name('clusters');
-	safeAdd(grassFolder, island, 'grassIsolatedTufts', 0, 600, 1)?.name('isolated tufts');
-	safeAdd(grassFolder, island, 'grassScaleMin', 0.1, 3, 0.01)?.name('scale min');
-	safeAdd(grassFolder, island, 'grassScaleMax', 0.1, 4, 0.01)?.name('scale max');
-	safeAdd(grassFolder, island, 'grassEdgeMargin', 0, 5, 0.01)?.name('edge margin');
-	safeAdd(grassFolder, island, 'grassMinSpacing', 0.05, 1, 0.01)?.name('spacing');
-
-	if (typeof island.generateGrass === 'function') {
-		grassFolder.add({ regenerate: () => island.generateGrass(true) }, 'regenerate').name('regenerate grass');
-	}
 
 	function resizeRendererToDisplaySize(renderer) {
 		const canvas = renderer.domElement;
@@ -955,7 +882,6 @@ function main() {
 		}
 
 		const delta = clock.getDelta();
-
 		renderInfoTimer += delta;
 
 		ambient.update(delta);
@@ -986,7 +912,6 @@ function main() {
 				'geometries:', renderer.info.memory.geometries,
 				'textures:', renderer.info.memory.textures
 			);
-
 			renderInfoTimer = 0;
 		}
 
