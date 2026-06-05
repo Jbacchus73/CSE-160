@@ -841,6 +841,9 @@ updateCameraModeUI();
 	}
 
 	function setAmbientVolume(v) {
+		ambient.volume = v;
+		ambient.baseVolume = v;
+
 		if (ambient.sound && typeof ambient.sound.setVolume === 'function') {
 			ambient.sound.setVolume(v);
 		}
@@ -875,10 +878,12 @@ updateCameraModeUI();
 		(v) => v.toFixed(3)
 	);
 
+	const ambientVolumeState = { volume: 0.5 };
+
 	bindSlider(
 		'#ambientVolumeSlider',
 		'#ambientVolumeVal',
-		{ volume: 0.5 },
+		ambientVolumeState,
 		'volume',
 		(v) => `${Math.round(v * 100)}%`,
 		setAmbientVolume
@@ -898,7 +903,7 @@ updateCameraModeUI();
 	});
 	document.querySelector('#musicNext')?.addEventListener('click', () => speakerAudio.next());
 	document.querySelector('#musicPrev')?.addEventListener('click', () => speakerAudio.prev());
-	
+
 	const audioToggle = document.querySelector('#audioToggle');
 	let audioOn = false;
 
