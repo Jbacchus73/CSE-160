@@ -16,7 +16,7 @@ export default class Studio {
 		rotationY = 0,
 
 		wallTexturePath = 'obj/textures/woodPlanks/',
-		roofTexturePath = 'obj/textures/WoodRoof/',
+		roofTexturePath = 'obj/textures/woodRoof/',
 
 		wallTilesPerUnit = 0.42,
 		roofTilesPerUnit = 0.55,

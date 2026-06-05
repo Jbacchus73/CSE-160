@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Island Music Studio</title>
+	<title>Studio Island</title>
 
 	<style>
 		html,
@@ -71,16 +71,16 @@
 			position: fixed;
 			left: 22px;
 			bottom: 22px;
-			padding: 14px 16px;
-			min-width: 225px;
-			background: rgba(245, 232, 178, 0.88);
-			border: 2px solid rgba(72, 54, 28, 0.45);
+			padding: 15px 17px;
+			min-width: 235px;
+			background: rgba(245, 232, 178, 0.92);
+			border: 2px solid rgba(72, 54, 28, 0.52);
 			border-radius: 14px;
-			box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+			box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
 			color: #352816;
 			text-shadow: none;
-			font-size: 14px;
-			line-height: 1.6;
+			font-size: 15px;
+			line-height: 1.65;
 		}
 
 		#hudDirections span {
@@ -95,8 +95,8 @@
 			right: 22px;
 			bottom: 22px;
 			padding: 10px 15px;
-			background: rgba(245, 232, 178, 0.88);
-			border: 2px solid rgba(72, 54, 28, 0.45);
+			background: rgba(245, 232, 178, 0.82);
+			border: 2px solid rgba(72, 54, 28, 0.42);
 			border-radius: 12px;
 			color: #352816;
 			font-size: 14px;
@@ -105,13 +105,29 @@
 			text-shadow: none;
 		}
 
+		#hudAdvisory {
+			position: fixed;
+			right: 22px;
+			top: 22px;
+			width: 285px;
+			padding: 11px 13px;
+			background: rgba(245, 232, 178, 0.76);
+			border: 2px solid rgba(72, 54, 28, 0.36);
+			border-radius: 12px;
+			color: #352816;
+			font-size: 14px;
+			font-weight: 700;
+			line-height: 1.35;
+			box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+			text-shadow: none;
+		}
+
 		#menuOverlay {
 			position: fixed;
 			inset: 0;
 			display: none;
 			z-index: 20;
-			background: rgba(30, 43, 48, 0.48);
-			backdrop-filter: blur(6px);
+			background: rgba(20, 30, 35, 0.16);
 		}
 
 		#menuOverlay.open {
@@ -121,14 +137,14 @@
 		}
 
 		#settingsPanel {
-			width: min(900px, calc(100vw - 48px));
+			width: min(760px, calc(100vw - 48px));
 			max-height: calc(100vh - 56px);
 			overflow: auto;
-			padding: 24px;
-			background: rgba(246, 232, 178, 0.96);
-			border: 3px solid rgba(78, 55, 25, 0.55);
-			border-radius: 20px;
-			box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+			padding: 22px;
+			background: rgba(246, 232, 178, 0.52);
+			border: 3px solid rgba(78, 55, 25, 0.42);
+			border-radius: 18px;
+			box-shadow: 0 24px 60px rgba(0, 0, 0, 0.26);
 			color: #312514;
 		}
 
@@ -137,13 +153,13 @@
 			justify-content: space-between;
 			align-items: flex-start;
 			gap: 18px;
-			margin-bottom: 20px;
+			margin-bottom: 18px;
 		}
 
 		#settingsHeader h1 {
 			margin: 0;
 			font-family: Georgia, "Times New Roman", serif;
-			font-size: 36px;
+			font-size: 34px;
 			line-height: 1;
 			color: #5e431f;
 		}
@@ -155,21 +171,20 @@
 		}
 
 		.settingsGrid {
-			display: grid;
-			grid-template-columns: 1fr 1fr;
-			gap: 16px;
+			display: block;
 		}
 
 		.settingsCard {
-			padding: 17px;
-			background: rgba(255, 248, 218, 0.6);
+			margin-bottom: 14px;
+			padding: 16px;
+			background: rgba(255, 248, 218, 0.42);
 			border: 2px solid rgba(86, 63, 31, 0.28);
-			border-radius: 15px;
+			border-radius: 14px;
 		}
 
 		.settingsCard h2 {
-			margin: 0 0 14px;
-			font-size: 22px;
+			margin: 0 0 13px;
+			font-size: 21px;
 			color: #513719;
 		}
 
@@ -240,20 +255,22 @@
 			color: #513719;
 		}
 
-		.graderNotes {
-			grid-column: 1 / -1;
-		}
-
-		.graderNotes ul {
+		.graderNotes ul,
+		.possibleMissed ul {
 			margin: 0;
 			padding-left: 21px;
 			line-height: 1.5;
 			font-size: 14px;
 		}
 
+		.possibleMissed {
+			background: rgba(255, 238, 190, 0.36);
+		}
+
 		@media (max-width: 760px) {
-			.settingsGrid {
-				grid-template-columns: 1fr;
+			#settingsPanel {
+				width: calc(100vw - 34px);
+				padding: 18px;
 			}
 
 			#hudTitle {
@@ -263,6 +280,11 @@
 			#hudDirections {
 				font-size: 13px;
 				min-width: 210px;
+			}
+
+			#hudAdvisory {
+				width: 230px;
+				font-size: 12px;
 			}
 		}
 	</style>
@@ -285,13 +307,18 @@
 	</div>
 
 	<div id="hud">
-		<div id="hudTitle">Island Music Studio</div>
+		<div id="hudTitle">Studio Island</div>
 
 		<div id="hudDirections">
 			<div><span>WASD</span> Move</div>
 			<div><span>Mouse</span> Look</div>
-			<div><span>Tab</span> Switch Camera</div>
+			<div><span>Tab</span> Switch cam</div>
 			<div><span>Esc</span> Settings</div>
+		</div>
+
+		<div id="hudAdvisory">
+			Tip: turn on music + ambient audio<br>
+			Free roam: click + drag to look around
 		</div>
 
 		<div id="hudMode">Walk Camera</div>
@@ -302,7 +329,7 @@
 			<div id="settingsHeader">
 				<div>
 					<h1>Settings</h1>
-					<p>Quick controls and project notes</p>
+					<p>Audio and camera options</p>
 				</div>
 				<button id="resumeBtn">Resume</button>
 			</div>
@@ -325,11 +352,11 @@
 
 					<div class="buttonRow">
 						<button id="musicPrev">Prev</button>
-						<button id="musicPlay">Play / Pause</button>
+						<button id="musicPlay">Play Music</button>
 						<button id="musicNext">Next</button>
 					</div>
 
-					<button id="audioToggle">Start Ambient</button>
+					<button id="audioToggle">Ambient Sound</button>
 				</section>
 
 				<section class="settingsCard">
@@ -349,19 +376,27 @@
 				</section>
 
 				<section class="settingsCard graderNotes">
-					<h2>Project Notes</h2>
+					<h2>Notes for Grader</h2>
 					<ul>
-						<li>Use WASD and the mouse to move around the island.</li>
-						<li>Press Tab to switch between walk mode and free-roam mode.</li>
-						<li>The scene uses OBJ/MTL models, textures, grass, trees, rocks, a dirt path, and a studio interior.</li>
-						<li>There is a day/night cycle, skybox, multiple lights, ambient audio, and music from the studio speakers.</li>
-						<li>I kept a lot of the extra details low-poly/simple so the scene still runs better.</li>
+						<li>Tab switches between walk mode and free-roam mode.</li>
+						<li>Esc opens this settings menu.</li>
+						<li>The studio uses OBJ/MTL models, textured surfaces, lighting, music, and a day/night cycle.</li>
+						<li>Music and ambient audio can be turned on from this menu.</li>
+					</ul>
+				</section>
+
+				<section class="settingsCard possibleMissed">
+					<h2>Things to Check</h2>
+					<ul>
+						<li>Audio only starts after pressing the buttons because browsers block autoplay.</li>
+						<li>In free-roam mode, click and drag with the mouse to rotate the camera.</li>
+						<li>Some assets may take a few seconds to load on GitHub Pages.</li>
 					</ul>
 				</section>
 			</div>
 		</div>
 	</div>
 
-	<script type="module" src="./asg5.js"></script>
+	<script type="module" src="./asg5.js?v=6"></script>
 </body>
 </html>

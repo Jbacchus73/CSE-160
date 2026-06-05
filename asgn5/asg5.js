@@ -440,6 +440,7 @@ function main() {
 	const switchButton = document.querySelector('#switchControls');
 
 	let menuOpen = false;
+	let ignoreNextPointerUnlock = false;
 
 	function updateCameraModeUI() {
 		const text = activeControls === 'walk' ? 'Walk Camera' : 'Free Roam Camera';
@@ -454,23 +455,53 @@ function main() {
 		}
 	}
 
+	function pauseActiveControls() {
+		ignoreNextPointerUnlock = true;
+
+		walkControls.disable();
+		spectatorControls.disable();
+
+		setTimeout(() => {
+			ignoreNextPointerUnlock = false;
+		}, 120);
+	}
+
+	function resumeActiveControls() {
+		if (menuOpen) return;
+
+		if (activeControls === 'walk') {
+			spectatorControls.disable();
+
+			setTimeout(() => {
+				if (!menuOpen && activeControls === 'walk') {
+					walkControls.enable();
+				}
+			}, 80);
+		} else {
+			walkControls.disable();
+			spectatorControls.enable();
+		}
+	}
+
 	function setCameraMode(mode) {
 		if (mode === activeControls) return;
 
-		if (mode === 'spectator') {
-			activeControls = 'spectator';
-			walkControls.disable();
-			spectatorControls.enable();
-		} else {
-			activeControls = 'walk';
-			spectatorControls.disable();
+		ignoreNextPointerUnlock = true;
+
+		walkControls.disable();
+		spectatorControls.disable();
+
+		activeControls = mode;
+
+		setTimeout(() => {
+			ignoreNextPointerUnlock = false;
 
 			if (!menuOpen) {
-				walkControls.enable();
+				resumeActiveControls();
 			}
-		}
 
-		updateCameraModeUI();
+			updateCameraModeUI();
+		}, 80);
 	}
 
 	function toggleCameraMode() {
@@ -486,12 +517,11 @@ function main() {
 			menuOverlay.classList.add('open');
 		}
 
-		if (activeControls === 'walk') {
-			walkControls.disable();
-		}
+		pauseActiveControls();
+		updateCameraModeUI();
 	}
 
-	function closeMenu() {
+	function closeMenu({ relock = true } = {}) {
 		if (!menuOpen) return;
 
 		menuOpen = false;
@@ -500,8 +530,21 @@ function main() {
 			menuOverlay.classList.remove('open');
 		}
 
+		updateCameraModeUI();
+
 		if (activeControls === 'walk') {
-			walkControls.enable();
+			spectatorControls.disable();
+
+			if (relock) {
+				setTimeout(() => {
+					if (!menuOpen && activeControls === 'walk') {
+						walkControls.enable();
+					}
+				}, 80);
+			}
+		} else {
+			walkControls.disable();
+			spectatorControls.enable();
 		}
 	}
 
@@ -514,13 +557,15 @@ function main() {
 	}
 
 	if (resumeBtn) {
-		resumeBtn.addEventListener('click', closeMenu);
+		resumeBtn.addEventListener('click', () => {
+			closeMenu({ relock: true });
+		});
 	}
 
 	if (menuOverlay) {
 		menuOverlay.addEventListener('click', (e) => {
 			if (e.target === menuOverlay) {
-				closeMenu();
+				closeMenu({ relock: true });
 			}
 		});
 	}
@@ -529,10 +574,29 @@ function main() {
 		switchButton.addEventListener('click', toggleCameraMode);
 	}
 
+	walkControls.controls.addEventListener('unlock', () => {
+		if (ignoreNextPointerUnlock) return;
+		if (menuOpen) return;
+		if (activeControls !== 'walk') return;
+
+		setTimeout(() => {
+			if (!menuOpen && activeControls === 'walk' && !ignoreNextPointerUnlock) {
+				openMenu();
+			}
+		}, 0);
+	});
+
 	window.addEventListener('keydown', (e) => {
 		if (e.code === 'Escape') {
 			e.preventDefault();
-			toggleMenu();
+
+			if (menuOpen) {
+				closeMenu({ relock: false });
+			} else {
+				openMenu();
+			}
+
+			return;
 		}
 
 		if (e.code === 'Tab') {
@@ -550,7 +614,7 @@ function main() {
 		}
 	});
 
-updateCameraModeUI();
+	updateCameraModeUI();
 
 	function distanceToSegment2D(px, pz, ax, az, bx, bz) {
 		const abx = bx - ax;
