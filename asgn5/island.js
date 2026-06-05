@@ -90,7 +90,15 @@ export default class Island {
 
 		const topGeo = this._makeIslandTopGeometry(radius, height, segments);
 
+		const groundTex = this._makeGroundTexture(512);
+		groundTex.wrapS = THREE.RepeatWrapping;
+		groundTex.wrapT = THREE.RepeatWrapping;
+		groundTex.repeat.set(10, 10);
+		groundTex.colorSpace = THREE.SRGBColorSpace;
+		groundTex.anisotropy = 8;
+
 		const topMat = new THREE.MeshStandardMaterial({
+			map: groundTex,
 			color: groundColor,
 			roughness: 1,
 			metalness: 0,
@@ -634,6 +642,54 @@ export default class Island {
 		}
 
 		return true;
+	}
+
+	_makeGroundTexture(size = 512) {
+		const canvas = document.createElement('canvas');
+		canvas.width = canvas.height = size;
+
+		const ctx = canvas.getContext('2d');
+
+		ctx.fillStyle = '#3d6b27';
+		ctx.fillRect(0, 0, size, size);
+
+		for (let i = 0; i < 1800; i++) {
+			const x = Math.random() * size;
+			const y = Math.random() * size;
+			const r = 1 + Math.random() * 4;
+
+			const tone = Math.random();
+
+			if (tone < 0.45) {
+				ctx.fillStyle = 'rgba(55, 95, 35, 0.18)';
+			} else if (tone < 0.8) {
+				ctx.fillStyle = 'rgba(88, 135, 55, 0.16)';
+			} else {
+				ctx.fillStyle = 'rgba(95, 70, 35, 0.12)';
+			}
+
+			ctx.beginPath();
+			ctx.arc(x, y, r, 0, Math.PI * 2);
+			ctx.fill();
+		}
+
+		for (let i = 0; i < 120; i++) {
+			const x = Math.random() * size;
+			const y = Math.random() * size;
+			const w = 8 + Math.random() * 36;
+
+			ctx.strokeStyle = 'rgba(30, 55, 22, 0.16)';
+			ctx.lineWidth = 1;
+			ctx.beginPath();
+			ctx.moveTo(x, y);
+			ctx.lineTo(x + w, y + Math.random() * 8 - 4);
+			ctx.stroke();
+		}
+
+		const texture = new THREE.CanvasTexture(canvas);
+		texture.needsUpdate = true;
+
+		return texture;
 	}
 
 	_makeCliffTexture(size = 512) {

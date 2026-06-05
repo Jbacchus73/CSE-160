@@ -1,286 +1,367 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Assignment 5</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Island Music Studio</title>
 
-  <style>
-    html, body {
-      margin: 0;
-      height: 100%;
-      overflow: hidden;
-    }
+	<style>
+		html,
+		body {
+			margin: 0;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: #7fc7df;
+			font-family: Arial, Helvetica, sans-serif;
+		}
 
-    #c {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
+		#c {
+			width: 100%;
+			height: 100%;
+			display: block;
+			position: fixed;
+			inset: 0;
+			z-index: 0;
+		}
 
-    #loading {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      pointer-events: none;
-    }
+		#loading {
+			position: fixed;
+			left: 50%;
+			top: 50%;
+			transform: translate(-50%, -50%);
+			z-index: 50;
+			width: 270px;
+			height: 16px;
+			background: rgba(245, 232, 178, 0.55);
+			border: 2px solid rgba(72, 54, 28, 0.45);
+			border-radius: 999px;
+			overflow: hidden;
+		}
 
-    #loading .progress {
-      margin: 1.5em;
-      border: 1px solid white;
-      width: 50vw;
-    }
+		.progressbar {
+			width: 100%;
+			height: 100%;
+			background: #d6a646;
+			transform-origin: left center;
+			transform: scaleX(0);
+		}
 
-    #loading .progressbar {
-      margin: 2px;
-      background: white;
-      height: 1em;
-      transform-origin: top left;
-      transform: scaleX(0);
-    }
+		#hud {
+			position: fixed;
+			inset: 0;
+			pointer-events: none;
+			z-index: 5;
+			color: #fff7d7;
+		}
 
-    #switchControls {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      z-index: 10;
-      padding: 8px 12px;
-      font-family: Arial, sans-serif;
-      font-size: 14px;
-      cursor: pointer;
-    }
+		#hudTitle {
+			position: fixed;
+			top: 24px;
+			left: 30px;
+			font-family: Georgia, "Times New Roman", serif;
+			font-size: 34px;
+			font-weight: 700;
+			letter-spacing: 0.5px;
+			color: #f1e88a;
+			text-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+		}
 
-    #instructions {
-      position: fixed;
-      bottom: 10px;
-      left: 10px;
-      z-index: 10;
-      padding: 8px 12px;
-      font-family: Arial, sans-serif;
-      font-size: 13px;
-      background: rgba(0, 0, 0, 0.55);
-      color: white;
-      border-radius: 6px;
-      line-height: 1.5;
-    }
+		#hudDirections {
+			position: fixed;
+			left: 22px;
+			bottom: 22px;
+			padding: 14px 16px;
+			min-width: 225px;
+			background: rgba(245, 232, 178, 0.88);
+			border: 2px solid rgba(72, 54, 28, 0.45);
+			border-radius: 14px;
+			box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+			color: #352816;
+			text-shadow: none;
+			font-size: 14px;
+			line-height: 1.6;
+		}
 
-    /* ---- Escape settings menu ---- */
-    #menuOverlay {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      display: none;
-      justify-content: center;
-      align-items: center;
-      background: rgba(10, 12, 16, 0.55);
-      backdrop-filter: blur(4px);
-      font-family: Arial, Helvetica, sans-serif;
-    }
+		#hudDirections span {
+			display: inline-block;
+			min-width: 82px;
+			color: #5b3f1f;
+			font-weight: 700;
+		}
 
-    #menuOverlay.open {
-      display: flex;
-    }
+		#hudMode {
+			position: fixed;
+			right: 22px;
+			bottom: 22px;
+			padding: 10px 15px;
+			background: rgba(245, 232, 178, 0.88);
+			border: 2px solid rgba(72, 54, 28, 0.45);
+			border-radius: 12px;
+			color: #352816;
+			font-size: 14px;
+			font-weight: 700;
+			box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+			text-shadow: none;
+		}
 
-    #menuPanel {
-      width: 340px;
-      max-width: 90vw;
-      max-height: 88vh;
-      overflow-y: auto;
-      background: rgba(28, 30, 38, 0.96);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
-      padding: 22px 24px 26px;
-      color: #f0f1f4;
-      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
-    }
+		#menuOverlay {
+			position: fixed;
+			inset: 0;
+			display: none;
+			z-index: 20;
+			background: rgba(30, 43, 48, 0.48);
+			backdrop-filter: blur(6px);
+		}
 
-    #menuPanel h2 {
-      margin: 0 0 4px;
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-    }
+		#menuOverlay.open {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
 
-    #menuPanel .subtitle {
-      margin: 0 0 18px;
-      font-size: 12px;
-      color: #9aa0ad;
-    }
+		#settingsPanel {
+			width: min(900px, calc(100vw - 48px));
+			max-height: calc(100vh - 56px);
+			overflow: auto;
+			padding: 24px;
+			background: rgba(246, 232, 178, 0.96);
+			border: 3px solid rgba(78, 55, 25, 0.55);
+			border-radius: 20px;
+			box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+			color: #312514;
+		}
 
-    #menuPanel h3 {
-      margin: 4px 0 6px;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-      color: #8a90a0;
-    }
+		#settingsHeader {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			gap: 18px;
+			margin-bottom: 20px;
+		}
 
-    .menu-row {
-      margin: 14px 0;
-    }
+		#settingsHeader h1 {
+			margin: 0;
+			font-family: Georgia, "Times New Roman", serif;
+			font-size: 36px;
+			line-height: 1;
+			color: #5e431f;
+		}
 
-    .menu-row label {
-      display: block;
-      font-size: 13px;
-      margin-bottom: 6px;
-      color: #c7ccd6;
-    }
+		#settingsHeader p {
+			margin: 8px 0 0;
+			color: #604a28;
+			font-size: 15px;
+		}
 
-    .menu-row .value {
-      float: right;
-      color: #8fb4ff;
-      font-variant-numeric: tabular-nums;
-    }
+		.settingsGrid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 16px;
+		}
 
-    .menu-row input[type="range"] {
-      width: 100%;
-      accent-color: #5b8cff;
-    }
+		.settingsCard {
+			padding: 17px;
+			background: rgba(255, 248, 218, 0.6);
+			border: 2px solid rgba(86, 63, 31, 0.28);
+			border-radius: 15px;
+		}
 
-    .menu-btn {
-      display: block;
-      width: 100%;
-      padding: 10px 12px;
-      margin-top: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #fff;
-      background: #3a6df0;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
+		.settingsCard h2 {
+			margin: 0 0 14px;
+			font-size: 22px;
+			color: #513719;
+		}
 
-    .menu-btn:hover {
-      background: #2f5ed6;
-    }
+		.settingsCard h3 {
+			margin: 0 0 8px;
+			font-size: 17px;
+			color: #513719;
+		}
 
-    .menu-btn.secondary {
-      background: rgba(255, 255, 255, 0.08);
-    }
+		.settingsCard label {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-top: 13px;
+			margin-bottom: 7px;
+			font-size: 14px;
+			font-weight: 700;
+		}
 
-    .menu-btn.secondary:hover {
-      background: rgba(255, 255, 255, 0.16);
-    }
+		.settingsCard strong {
+			color: #6f4c1e;
+		}
 
-    /* small side-by-side buttons for prev/next */
-    .menu-btn-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
+		input[type="range"] {
+			width: 100%;
+			accent-color: #a97a2c;
+		}
 
-    .menu-btn-row .menu-btn {
-      margin-top: 0;
-      flex: 1;
-    }
+		button {
+			border: 0;
+			border-radius: 10px;
+			padding: 9px 14px;
+			background: #5f7d54;
+			color: #fff7d7;
+			font-family: inherit;
+			font-weight: 700;
+			cursor: pointer;
+			box-shadow: 0 4px 0 #3e5536;
+		}
 
-    .menu-divider {
-      height: 1px;
-      background: rgba(255, 255, 255, 0.1);
-      margin: 18px 0 14px;
-    }
+		button:hover {
+			filter: brightness(1.06);
+		}
 
-    #nowPlaying {
-      margin-top: 10px;
-      font-size: 12px;
-      color: #9aa0ad;
-      text-align: center;
-      font-variant-numeric: tabular-nums;
-    }
+		button:active {
+			transform: translateY(3px);
+			box-shadow: 0 1px 0 #3e5536;
+		}
 
-    #menuHint {
-      margin-top: 16px;
-      font-size: 11px;
-      color: #7c828f;
-      text-align: center;
-    }
-  </style>
+		.buttonRow {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 10px;
+			margin: 17px 0 12px;
+		}
 
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/"
-    }
-  }
-  </script>
+		.cameraBox {
+			margin-top: 18px;
+			padding: 13px;
+			background: rgba(95, 125, 84, 0.16);
+			border: 1px solid rgba(70, 88, 58, 0.3);
+			border-radius: 12px;
+		}
+
+		.cameraBox p {
+			margin: 0 0 12px;
+			font-weight: 700;
+			color: #513719;
+		}
+
+		.graderNotes {
+			grid-column: 1 / -1;
+		}
+
+		.graderNotes ul {
+			margin: 0;
+			padding-left: 21px;
+			line-height: 1.5;
+			font-size: 14px;
+		}
+
+		@media (max-width: 760px) {
+			.settingsGrid {
+				grid-template-columns: 1fr;
+			}
+
+			#hudTitle {
+				font-size: 28px;
+			}
+
+			#hudDirections {
+				font-size: 13px;
+				min-width: 210px;
+			}
+		}
+	</style>
+
+	<script type="importmap">
+	{
+		"imports": {
+			"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+			"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+		}
+	}
+	</script>
 </head>
 
 <body>
-  <canvas id="c"></canvas>
+	<canvas id="c"></canvas>
 
-  <button id="switchControls">Switch to Free Roam Controls</button>
+	<div id="loading">
+		<div class="progressbar"></div>
+	</div>
 
-  <div id="instructions">
-    Walk: click to look, WASD to move.<br>
-    Free Roam: click-drag to look, WASD to move, Space/C up/down, Shift sprint.<br>
-    Press <b>Esc</b> for settings.
-  </div>
+	<div id="hud">
+		<div id="hudTitle">Island Music Studio</div>
 
-  <!-- Escape settings menu -->
-  <div id="menuOverlay">
-    <div id="menuPanel">
-      <h2>Settings</h2>
-      <p class="subtitle">Press Esc to close</p>
+		<div id="hudDirections">
+			<div><span>WASD</span> Move</div>
+			<div><span>Mouse</span> Look</div>
+			<div><span>Tab</span> Switch Camera</div>
+			<div><span>Esc</span> Settings</div>
+		</div>
 
-      <h3>Environment</h3>
+		<div id="hudMode">Walk Camera</div>
+	</div>
 
-      <div class="menu-row">
-        <label>Cycle Speed <span class="value" id="speedVal"></span></label>
-        <input type="range" id="speedSlider" min="0" max="0.3" step="0.001">
-      </div>
+	<div id="menuOverlay">
+		<div id="settingsPanel">
+			<div id="settingsHeader">
+				<div>
+					<h1>Settings</h1>
+					<p>Quick controls and project notes</p>
+				</div>
+				<button id="resumeBtn">Resume</button>
+			</div>
 
-      <div class="menu-row">
-        <label>Sun Intensity <span class="value" id="sunVal"></span></label>
-        <input type="range" id="sunSlider" min="0" max="6" step="0.01">
-      </div>
+			<div class="settingsGrid">
+				<section class="settingsCard">
+					<h2>Audio</h2>
 
-      <div class="menu-row">
-        <label>Moon Intensity <span class="value" id="moonVal"></span></label>
-        <input type="range" id="moonSlider" min="0" max="3" step="0.01">
-      </div>
+					<label>
+						<span>Music Volume</span>
+						<strong id="musicVolumeVal">85%</strong>
+					</label>
+					<input id="musicVolumeSlider" type="range" min="0" max="1" step="0.01" value="0.85">
 
-      <div class="menu-divider"></div>
+					<label>
+						<span>Ambient Volume</span>
+						<strong id="ambientVolumeVal">50%</strong>
+					</label>
+					<input id="ambientVolumeSlider" type="range" min="0" max="1" step="0.01" value="0.5">
 
-      <h3>Audio</h3>
+					<div class="buttonRow">
+						<button id="musicPrev">Prev</button>
+						<button id="musicPlay">Play / Pause</button>
+						<button id="musicNext">Next</button>
+					</div>
 
-      <button class="menu-btn" id="audioToggle">🔊 Start Ambient</button>
+					<button id="audioToggle">Start Ambient</button>
+				</section>
 
-      <div class="menu-row">
-        <label>Music Volume <span class="value" id="musicVolVal"></span></label>
-        <input type="range" id="musicVolSlider" min="0" max="1" step="0.01">
-      </div>
+				<section class="settingsCard">
+					<h2>World</h2>
 
-      <button class="menu-btn" id="musicPlay">▶ Play / Pause Music</button>
+					<label>
+						<span>Day / Night Speed</span>
+						<strong id="speedVal">0.005</strong>
+					</label>
+					<input id="speedSlider" type="range" min="0" max="0.03" step="0.001" value="0.005">
 
-      <div class="menu-btn-row">
-        <button class="menu-btn secondary" id="musicPrev">⏮ Prev</button>
-        <button class="menu-btn secondary" id="musicNext">Next ⏭</button>
-      </div>
+					<div class="cameraBox">
+						<h3>Camera</h3>
+						<p id="cameraModeText">Walk Camera</p>
+						<button id="switchControls">Switch Camera</button>
+					</div>
+				</section>
 
-      <div id="nowPlaying">No track playing</div>
+				<section class="settingsCard graderNotes">
+					<h2>Project Notes</h2>
+					<ul>
+						<li>Use WASD and the mouse to move around the island.</li>
+						<li>Press Tab to switch between walk mode and free-roam mode.</li>
+						<li>The scene uses OBJ/MTL models, textures, grass, trees, rocks, a dirt path, and a studio interior.</li>
+						<li>There is a day/night cycle, skybox, multiple lights, ambient audio, and music from the studio speakers.</li>
+						<li>I kept a lot of the extra details low-poly/simple so the scene still runs better.</li>
+					</ul>
+				</section>
+			</div>
+		</div>
+	</div>
 
-      <div class="menu-divider"></div>
-
-      <button class="menu-btn secondary" id="resumeBtn">Resume</button>
-
-      <div id="menuHint">Tip: Esc also exits Walk look-mode</div>
-    </div>
-  </div>
-
-  <div id="loading">
-    <div class="progress">
-      <div class="progressbar"></div>
-    </div>
-  </div>
-
-  <script type="module" src="asg5.js"></script>
+	<script type="module" src="./asg5.js"></script>
 </body>
 </html>

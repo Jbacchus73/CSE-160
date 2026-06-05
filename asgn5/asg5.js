@@ -145,12 +145,12 @@ function main() {
 
 	const speakerAudio = new SpeakerAudio(ambient.listener, {
 		tracks: [
-			'audio/track1.mp3',
-			'audio/track2.mp3',
-			'audio/track3.mp3',
-			'audio/track4.mp3',
-			'audio/track5.mp3',
-			'audio/track6.mp3',
+			'audio/track1.wav',
+			'audio/track2.wav',
+			'audio/track3.wav',
+			'audio/track4.wav',
+			'audio/track5.wav',
+			'audio/track6.wav',
 		],
 		volume: 0.85,
 		refDistance: 2,
@@ -161,7 +161,6 @@ function main() {
 	let activeControls = 'walk';
 	let renderInfoTimer = 0;
 
-	const switchButton = document.querySelector('#switchControls');
 
 	const clock = new THREE.Clock();
 
@@ -418,7 +417,7 @@ function main() {
 		grassCullMaxDistance: 40,
 		grassCullExtraMargin: 1.05,
 		grassForwardDotLimit: -1,
-		grassSimplifyRatio: 0.93,
+		grassSimplifyRatio: 0.95,
 		grassCullingDebug: false,
 
 		autoGenerateGrass: false,
@@ -436,67 +435,338 @@ function main() {
 	// ---------------- Escape settings menu ----------------
 	const menuOverlay = document.querySelector('#menuOverlay');
 	const resumeBtn = document.querySelector('#resumeBtn');
+	const cameraModeText = document.querySelector('#cameraModeText');
+	const hudMode = document.querySelector('#hudMode');
+	const switchButton = document.querySelector('#switchControls');
+
 	let menuOpen = false;
+
+	function updateCameraModeUI() {
+		const text = activeControls === 'walk' ? 'Walk Camera' : 'Free Roam Camera';
+
+		if (cameraModeText) cameraModeText.textContent = text;
+		if (hudMode) hudMode.textContent = text;
+
+		if (switchButton) {
+			switchButton.textContent = activeControls === 'walk'
+				? 'Switch to Free Roam'
+				: 'Switch to Walk';
+		}
+	}
+
+	function setCameraMode(mode) {
+		if (mode === activeControls) return;
+
+		if (mode === 'spectator') {
+			activeControls = 'spectator';
+			walkControls.disable();
+			spectatorControls.enable();
+		} else {
+			activeControls = 'walk';
+			spectatorControls.disable();
+
+			if (!menuOpen) {
+				walkControls.enable();
+			}
+		}
+
+		updateCameraModeUI();
+	}
+
+	function toggleCameraMode() {
+		setCameraMode(activeControls === 'walk' ? 'spectator' : 'walk');
+	}
 
 	function openMenu() {
 		if (menuOpen) return;
+
 		menuOpen = true;
-		menuOverlay.classList.add('open');
-		// release walk look so the cursor is usable in the menu
-		if (activeControls === 'walk') walkControls.disable();
+
+		if (menuOverlay) {
+			menuOverlay.classList.add('open');
+		}
+
+		if (activeControls === 'walk') {
+			walkControls.disable();
+		}
 	}
 
 	function closeMenu() {
 		if (!menuOpen) return;
+
 		menuOpen = false;
-		menuOverlay.classList.remove('open');
-		// re-enter walk look-mode if that's the active camera
-		if (activeControls === 'walk') walkControls.enable();
+
+		if (menuOverlay) {
+			menuOverlay.classList.remove('open');
+		}
+
+		if (activeControls === 'walk') {
+			walkControls.enable();
+		}
 	}
 
 	function toggleMenu() {
-		menuOpen ? closeMenu() : openMenu();
+		if (menuOpen) {
+			closeMenu();
+		} else {
+			openMenu();
+		}
 	}
 
-	if (resumeBtn) resumeBtn.addEventListener('click', closeMenu);
+	if (resumeBtn) {
+		resumeBtn.addEventListener('click', closeMenu);
+	}
 
-	// Esc toggles the menu. In walk mode the browser also fires Esc to exit
-	// pointer-lock; that just disables walk look, and we open the menu here.
+	if (menuOverlay) {
+		menuOverlay.addEventListener('click', (e) => {
+			if (e.target === menuOverlay) {
+				closeMenu();
+			}
+		});
+	}
+
+	if (switchButton) {
+		switchButton.addEventListener('click', toggleCameraMode);
+	}
+
 	window.addEventListener('keydown', (e) => {
 		if (e.code === 'Escape') {
 			e.preventDefault();
 			toggleMenu();
 		}
+
+		if (e.code === 'Tab') {
+			e.preventDefault();
+
+			if (!menuOpen) {
+				toggleCameraMode();
+			}
+		}
 	});
 
-	// click outside the panel closes
-	menuOverlay.addEventListener('click', (e) => {
-		if (e.target === menuOverlay) closeMenu();
-	});
-
-	// canvas click: enter walk look-mode (only when menu is closed)
 	renderer.domElement.addEventListener('click', () => {
 		if (!menuOpen && activeControls === 'walk') {
 			walkControls.enable();
 		}
 	});
 
-	// camera mode switch button
-	if (switchButton) {
-		switchButton.textContent = 'Switch to Free Roam Controls';
-		switchButton.addEventListener('click', () => {
-			if (activeControls === 'walk') {
-				activeControls = 'spectator';
-				walkControls.disable();
-				spectatorControls.enable();
-				switchButton.textContent = 'Switch to Walk Controls';
-			} else {
-				activeControls = 'walk';
-				spectatorControls.disable();
-				walkControls.enable();
-				switchButton.textContent = 'Switch to Free Roam Controls';
-			}
+updateCameraModeUI();
+
+	function distanceToSegment2D(px, pz, ax, az, bx, bz) {
+		const abx = bx - ax;
+		const abz = bz - az;
+		const apx = px - ax;
+		const apz = pz - az;
+
+		const abLenSq = abx * abx + abz * abz;
+		if (abLenSq === 0) return Math.hypot(px - ax, pz - az);
+
+		const t = THREE.MathUtils.clamp((apx * abx + apz * abz) / abLenSq, 0, 1);
+		const cx = ax + abx * t;
+		const cz = az + abz * t;
+
+		return Math.hypot(px - cx, pz - cz);
+	}
+
+	function addDirtPathToStudio() {
+		const pathMat = new THREE.MeshStandardMaterial({
+			color: 0x6b4a2f,
+			roughness: 1,
+			metalness: 0,
 		});
+
+		const edgeMat = new THREE.MeshStandardMaterial({
+			color: 0x3f2a1a,
+			roughness: 1,
+			metalness: 0,
+		});
+
+		const house = collisionObjects.house;
+
+		const startLocal = {
+			x: house.doorCenterX,
+			z: house.depth / 2 + 0.60,
+		};
+
+		const start = houseLocalToWorld(startLocal, house);
+
+		const end = {
+			x: 0,
+			z: 8,
+		};
+
+		window.pathBlockerSegment = {
+			ax: start.x,
+			az: start.z,
+			bx: end.x,
+			bz: end.z,
+			radius: 1.15,
+		};
+
+		const dx = end.x - start.x;
+		const dz = end.z - start.z;
+		const length = Math.hypot(dx, dz);
+
+		const pathWidth = 1.05;
+
+		const path = new THREE.Mesh(
+			new THREE.BoxGeometry(pathWidth, 0.022, length),
+			pathMat
+		);
+
+		path.position.set(
+			(start.x + end.x) / 2,
+			island.surfaceY + 0.017,
+			(start.z + end.z) / 2
+		);
+
+		path.rotation.y = Math.atan2(dx, dz);
+		path.castShadow = false;
+		path.receiveShadow = true;
+		scene.add(path);
+
+		const leftEdge = new THREE.Mesh(
+			new THREE.BoxGeometry(0.07, 0.028, length),
+			edgeMat
+		);
+		leftEdge.position.set(-pathWidth / 2 - 0.045, 0.012, 0);
+		leftEdge.castShadow = false;
+		leftEdge.receiveShadow = true;
+		path.add(leftEdge);
+
+		const rightEdge = leftEdge.clone();
+		rightEdge.position.set(pathWidth / 2 + 0.045, 0.012, 0);
+		path.add(rightEdge);
+
+		for (let i = 0; i < 45; i++) {
+			const pebble = new THREE.Mesh(
+				new THREE.DodecahedronGeometry(THREE.MathUtils.randFloat(0.018, 0.04), 0),
+				edgeMat
+			);
+
+			const side = Math.random() < 0.5 ? -1 : 1;
+
+			pebble.position.set(
+				side * THREE.MathUtils.randFloat(pathWidth * 0.5, pathWidth * 0.67),
+				0.035,
+				THREE.MathUtils.randFloat(-length / 2, length / 2)
+			);
+
+			pebble.rotation.set(
+				Math.random() * Math.PI,
+				Math.random() * Math.PI,
+				Math.random() * Math.PI
+			);
+
+			pebble.scale.y = THREE.MathUtils.randFloat(0.35, 0.65);
+			pebble.castShadow = true;
+			pebble.receiveShadow = true;
+			path.add(pebble);
+		}
+
+		if (typeof island.addGrassBlockerCircle === 'function') {
+			const blockerCount = 16;
+
+			for (let i = 0; i <= blockerCount; i++) {
+				const t = i / blockerCount;
+				const bx = start.x + dx * t;
+				const bz = start.z + dz * t;
+
+				island.addGrassBlockerCircle(bx, bz, 1.05);
+			}
+
+			island.addGrassBlockerCircle(start.x, start.z, 1.4);
+			island.addGrassBlockerCircle(end.x, end.z, 1.25);
+		}
+
+		window.pathMesh = path;
+	}
+
+	function addLowPolyRocks() {
+		const rockMat = new THREE.MeshStandardMaterial({
+			color: 0x6a6258,
+			roughness: 0.95,
+			metalness: 0,
+		});
+
+		const darkRockMat = new THREE.MeshStandardMaterial({
+			color: 0x4f4a44,
+			roughness: 0.98,
+			metalness: 0,
+		});
+
+		const rockPositions = [
+			{ x: -10.5, z: 6.5, s: 0.65 },
+			{ x: -12.4, z: -2.8, s: 0.5 },
+			{ x: -7.2, z: -11.8, s: 0.75 },
+			{ x: 1.8, z: 12.6, s: 0.45 },
+			{ x: 9.8, z: 7.5, s: 0.7 },
+			{ x: 12.3, z: -3.4, s: 0.55 },
+			{ x: -3.7, z: 9.4, s: 0.5 },
+			{ x: 7.8, z: -6.0, s: 0.42 },
+		];
+
+		for (const p of rockPositions) {
+			if (window.pathBlockerSegment) {
+				const d = distanceToSegment2D(
+					p.x,
+					p.z,
+					window.pathBlockerSegment.ax,
+					window.pathBlockerSegment.az,
+					window.pathBlockerSegment.bx,
+					window.pathBlockerSegment.bz
+				);
+
+				if (d < window.pathBlockerSegment.radius + p.s) {
+					continue;
+				}
+			}
+
+			const rockGroup = new THREE.Group();
+			const rockCount = THREE.MathUtils.randInt(1, 3);
+
+			for (let i = 0; i < rockCount; i++) {
+				const rock = new THREE.Mesh(
+					new THREE.DodecahedronGeometry(p.s * THREE.MathUtils.randFloat(0.45, 0.85), 0),
+					Math.random() < 0.5 ? rockMat : darkRockMat
+				);
+
+				rock.position.set(
+					THREE.MathUtils.randFloat(-0.25, 0.25),
+					p.s * 0.22,
+					THREE.MathUtils.randFloat(-0.25, 0.25)
+				);
+
+				rock.scale.set(
+					THREE.MathUtils.randFloat(1.0, 1.45),
+					THREE.MathUtils.randFloat(0.35, 0.7),
+					THREE.MathUtils.randFloat(0.8, 1.25)
+				);
+
+				rock.rotation.set(
+					Math.random() * Math.PI,
+					Math.random() * Math.PI,
+					Math.random() * Math.PI
+				);
+
+				rock.castShadow = true;
+				rock.receiveShadow = true;
+				rockGroup.add(rock);
+			}
+
+			rockGroup.position.set(p.x, island.surfaceY, p.z);
+			scene.add(rockGroup);
+
+			addCullable(rockGroup, {
+				maxDistance: 55,
+				extraMargin: 1.4,
+				minRadius: 2,
+			});
+
+			if (typeof island.addGrassBlockerCircle === 'function') {
+				island.addGrassBlockerCircle(p.x, p.z, p.s * 1.4);
+			}
+		}
 	}
 
 	const studio = new Studio(scene, {
@@ -527,6 +797,9 @@ function main() {
 		island.addGrassBlockerCircle(5, -10.5, 5.7);
 	}
 
+	addDirtPathToStudio();
+	addLowPolyRocks();
+
 	const dayNight = new DayNight(scene, {
 		radius: 34,
 		speed: 0.005,
@@ -548,48 +821,100 @@ function main() {
 		nightSky: 'skycube/night.png',
 	});
 
-	// ---- wire menu sliders to dayNight ----
-	function bindSlider(sliderId, valueId, obj, prop, format = (v) => v.toFixed(2)) {
+	function bindSlider(sliderId, valueId, obj, prop, format = (v) => v.toFixed(2), onChange = null) {
 		const slider = document.querySelector(sliderId);
 		const valueEl = document.querySelector(valueId);
 		if (!slider) return;
 
 		slider.value = obj[prop];
-		if (valueEl) valueEl.textContent = format(obj[prop]);
 
-		slider.addEventListener('input', () => {
+		const updateValue = () => {
 			const v = parseFloat(slider.value);
 			obj[prop] = v;
 			if (valueEl) valueEl.textContent = format(v);
-		});
+			if (onChange) onChange(v);
+		};
+
+		updateValue();
+
+		slider.addEventListener('input', updateValue);
 	}
 
-	bindSlider('#speedSlider', '#speedVal', dayNight, 'speed', (v) => v.toFixed(3));
-	bindSlider('#sunSlider', '#sunVal', dayNight, 'sunIntensity');
-	bindSlider('#moonSlider', '#moonVal', dayNight, 'moonIntensity');
-
-	// ---- audio toggle (now lives in the menu) ----
-	const audioToggle = document.querySelector('#audioToggle');
-	let audioOn = false;
-	if (audioToggle) {
-		audioToggle.addEventListener('click', () => {
-			if (!audioOn) {
-				ambient.play();
-				audioToggle.textContent = '🔇 Mute Audio';
-				audioOn = true;
-			} else {
-				ambient.pause();
-				audioToggle.textContent = '🔊 Start Audio';
-				audioOn = false;
-			}
-		});
+	function setAmbientVolume(v) {
+		if (ambient.sound && typeof ambient.sound.setVolume === 'function') {
+			ambient.sound.setVolume(v);
+		}
 	}
+
+	function setMusicVolume(v) {
+		if (typeof speakerAudio.setVolume === 'function') {
+			speakerAudio.setVolume(v);
+			return;
+		}
+
+		speakerAudio.volume = v;
+
+		if (speakerAudio.sound && typeof speakerAudio.sound.setVolume === 'function') {
+			speakerAudio.sound.setVolume(v);
+		}
+
+		if (speakerAudio.leftSound && typeof speakerAudio.leftSound.setVolume === 'function') {
+			speakerAudio.leftSound.setVolume(v);
+		}
+
+		if (speakerAudio.rightSound && typeof speakerAudio.rightSound.setVolume === 'function') {
+			speakerAudio.rightSound.setVolume(v);
+		}
+	}
+
+	bindSlider(
+		'#speedSlider',
+		'#speedVal',
+		dayNight,
+		'speed',
+		(v) => v.toFixed(3)
+	);
+
+	bindSlider(
+		'#ambientVolumeSlider',
+		'#ambientVolumeVal',
+		{ volume: 0.5 },
+		'volume',
+		(v) => `${Math.round(v * 100)}%`,
+		setAmbientVolume
+	);
+
+	bindSlider(
+		'#musicVolumeSlider',
+		'#musicVolumeVal',
+		{ volume: 0.85 },
+		'volume',
+		(v) => `${Math.round(v * 100)}%`,
+		setMusicVolume
+	);
 
 	document.querySelector('#musicPlay')?.addEventListener('click', () => {
 	speakerAudio.isPlaying ? speakerAudio.pause() : speakerAudio.play();
 	});
 	document.querySelector('#musicNext')?.addEventListener('click', () => speakerAudio.next());
 	document.querySelector('#musicPrev')?.addEventListener('click', () => speakerAudio.prev());
+	
+	const audioToggle = document.querySelector('#audioToggle');
+	let audioOn = false;
+
+	if (audioToggle) {
+		audioToggle.addEventListener('click', () => {
+			if (!audioOn) {
+				ambient.play();
+				audioToggle.textContent = 'Stop Ambient';
+				audioOn = true;
+			} else {
+				ambient.pause();
+				audioToggle.textContent = 'Start Ambient';
+				audioOn = false;
+			}
+		});
+	}
 
 	function normalizeTree(root) {
 		const box = new THREE.Box3().setFromObject(root);
